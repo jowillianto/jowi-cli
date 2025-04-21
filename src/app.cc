@@ -28,10 +28,9 @@ namespace moderna::cli {
       const parse_result &exit_on_help(int ret_code = 0) const {
         auto args = app_ref.get().arguments();
         if (args.args().contains("--help") || args.args().contains("-h")) {
-          std::print(stdout, "{}", app_ref.get().identity());
+          std::print(stdout, "{}\n", app_ref.get().identity());
           const parsed_argument &args = app_ref.get().arguments();
           // Print Positional Arguments First
-          std::print("\n");
           for (auto arg = args.args().begin(); arg != args.args().end(); arg += 1) {
             if (arg + 1 == args.args().end()) {
               std::print(stdout, "{}\n", arg->positional_argument);
@@ -39,6 +38,7 @@ namespace moderna::cli {
               std::print(stdout, "{} ", arg->positional_argument);
             }
           }
+          std::print("{}\n\n", app_ref.get().help_text());
           auto &parser = app_ref.get().parser();
           for (auto tier = parser.begin() + args.tier() - 1; tier < parser.end(); tier += 1) {
             if (tier != parser.begin()) {
@@ -79,11 +79,20 @@ namespace moderna::cli {
     app_identity __identity;
     argument_parser __parser;
     parsed_argument __parsed_args;
+    std::string __help;
 
   public:
     app(app_identity id, int argc, const char **argv) :
-      __identity{std::move(id)}, __parser{}, __parsed_args{parsed_argument::empty(argc, argv)} {}
+      __identity{std::move(id)}, __parser{}, __parsed_args{parsed_argument::empty(argc, argv)},
+      __help{__identity.description} {}
 
+    std::string_view help_text() const noexcept {
+      return __help;
+    }
+    app &help(std::string v) noexcept {
+      __help = std::move(v);
+      return *this;
+    }
     /*
       Adds argument into the parser. This mirrors the call signature for
       argument_parser::add_argument

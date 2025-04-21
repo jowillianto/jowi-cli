@@ -41,14 +41,8 @@ namespace moderna::cli {
       require_value = false;
       return *this;
     }
-    template <class T>
-      requires(std::assignable_from<decltype(help_text) &, T> || std::constructible_from<std::string, T>)
-    parameter_argument &help(T &&v) noexcept {
-      if constexpr (std::assignable_from<decltype(help_text) &, T>) {
-        help_text = std::forward<T>(v);
-      } else {
-        help_text.emplace(std::forward<T>(v));
-      }
+    parameter_argument &help(std::string_view v) noexcept {
+      help_text = std::string{v};
       return *this;
     }
   };
@@ -70,10 +64,8 @@ namespace moderna::cli {
       return *this;
     }
 
-    template <class T>
-      requires(std::assignable_from<decltype(help_text) &, T>)
-    position_argument &help(T &&v) noexcept {
-      help_text = std::forward<T>(v);
+    position_argument &help(std::string_view v) noexcept {
+      help_text = std::string{v};
       return *this;
     }
   };
