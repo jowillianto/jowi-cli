@@ -1,6 +1,8 @@
 module;
+#include <algorithm>
 #include <expected>
 #include <format>
+#include <functional>
 #include <optional>
 #include <print>
 #include <string>
@@ -10,9 +12,73 @@ import :argument_value;
 import :argument_parser_error;
 import :app_version;
 import :app_identity;
+import :argument;
 import :argument_key;
-
 namespace moderna::cli {
+  struct help_formatter {
+    bool include_app_id = true;
+    std::string operator()(
+      const argument_parser &parser, const parsed_argument &args, const app_identity &id
+    ) const {
+      std::string buf;
+      auto it = std::back_insert_iterator(buf);
+      if (include_app_id) {
+        std::format_to(it, "{}\n", id);
+      }
+      (*this)(it, parser, args);
+      return buf;
+    }
+
+    std::back_insert_iterator<std::string> &operator()(
+      std::back_insert_iterator<std::string> &it,
+      const argument_parser &parser,
+      const parsed_argument &args
+    ) const {
+      // Print The currently inputted positional arguments
+      for (auto arg = args.arg_begin(); arg != args.arg_end(); arg++) {
+        if (arg + 1 == args.arg_end()) {
+          std::format_to(it, "{}\n", arg->positional_argument);
+        } else {
+          std::format_to(it, "{} ", arg->positional_argument);
+        }
+      }
+      // Print the parameters help starting from the currently inputted tier.
+      for (auto tier = parser.begin() + args.tier() - 1; tier != parser.end(); tier++) {
+        // Print argument help
+        auto tier_id = std::distance(parser.begin(), tier);
+        if (tier != parser.begin() && tier > parser.begin() + args.tier() - 1) {
+          std::format_to(
+            it, "arg{} - {}\n", tier_id, tier->positional.help_text.value_or("<no-help>")
+          );
+          if (tier->positional.options) {
+            std::format_to(it, "Options: \n");
+            for (auto option = tier->positional.options->begin();
+                 option != tier->positional.options->end();
+                 option++) {
+              if (option->help_text) {
+                std::format_to(it, "{:16} : {}\n", option->option, option->help_text.value());
+              } else {
+                std::format_to(it, "{:16}\n", option->option);
+              }
+            }
+          }
+        }
+        for (auto parameter = tier->parameters.begin(); parameter != tier->parameters.end();
+             parameter += 1) {
+          if (parameter->help_text) {
+            std::format_to(
+              it, "{:16} : {}\n", parameter->key.value(), parameter->help_text.value()
+            );
+          } else {
+            std::format_to(it, "{:16}\n", parameter->key.value());
+          }
+        }
+      }
+      return it;
+    }
+  };
+
+  export struct app_option;
   export class app {
     struct parse_result {
       std::reference_wrapper<const app> app_ref;
@@ -20,60 +86,35 @@ namespace moderna::cli {
 
       const parse_result &exit_on_error(bool print_err = true, int err_code = 1) const {
         if (err) {
-          std::println(stderr, "Error of type {} : {}", err->type(), err->what());
-          exit(err_code);
+          app_ref.get().error(err_code, "Error of type {} : {}", err->type(), err->what());
         }
         return *this;
       }
-      const parse_result &exit_on_help(int ret_code = 0) const {
+      const parse_result &exit_on_help(
+        int ret_code = 0, help_formatter format = help_formatter{}
+      ) const {
         auto args = app_ref.get().arguments();
-        if (args.args().contains("--help") || args.args().contains("-h")) {
-          std::print(stdout, "{}\n", app_ref.get().identity());
-          const parsed_argument &args = app_ref.get().arguments();
-          // Print Positional Arguments First
-          for (auto arg = args.args().begin(); arg != args.args().end(); arg += 1) {
-            if (arg + 1 == args.args().end()) {
-              std::print(stdout, "{}\n", arg->positional_argument);
-            } else {
-              std::print(stdout, "{} ", arg->positional_argument);
-            }
-          }
-          std::print("{}\n\n", app_ref.get().help_text());
-          auto &parser = app_ref.get().parser();
-          for (auto tier = parser.begin() + args.tier() - 1; tier < parser.end(); tier += 1) {
-            if (tier != parser.begin()) {
-              auto id = std::distance(parser.begin(), tier);
-              std::print(
-                "arg{} - {} - [{}]\n",
-                id,
-                tier->positional.help_text.value_or("<no-help>"),
-                tier->positional.options
-                  .transform([](const auto &options) {
-                    std::string opt;
-                    for (auto option = options.begin(); option != options.end(); option += 1) {
-                      if (option + 1 == options.end()) {
-                        std::format_to(std::back_inserter(opt), "{}", *option);
-                      } else {
-                        std::format_to(std::back_inserter(opt), "{}, ", *option);
-                      }
-                    }
-                    return opt;
-                  })
-                  .value_or("<no-choices>")
-              );
-            }
-            for (auto parameter = tier->parameters.begin(); parameter != tier->parameters.end();
-                 parameter += 1) {
-              if (parameter->help_text) {
-                std::print("{:16} : {}\n", parameter->key.value(), parameter->help_text.value());
-              } else {
-                std::print("{:16}\n", parameter->key.value());
-              }
-            }
-          }
+        if (args.contains("--help") || args.contains("-h")) {
+          std::println(
+            stdout,
+            "{}",
+            format(app_ref.get().parser(), app_ref.get().arguments(), app_ref.get().identity())
+          );
           exit(ret_code);
         }
         return *this;
+      }
+      void assert_final() {
+        if (!app_ref.get().arguments().is_end()) {
+          std::string args;
+          auto args_inserter = std::back_inserter(args);
+          for (auto arg = app_ref.get().arguments().raw_arg_cur();
+               arg != app_ref.get().arguments().raw_arg_end();
+               arg++) {
+            std::format_to(args_inserter, "{} ", *arg);
+          }
+          app_ref.get().error(1, "Error: Unknown Arguments : {}", args);
+        }
       }
     };
     app_identity __identity;
@@ -82,9 +123,11 @@ namespace moderna::cli {
     std::string __help;
 
   public:
-    app(app_identity id, int argc, const char **argv) :
+    app(app_identity id, int argc, const char **argv, bool auto_help = true) :
       __identity{std::move(id)}, __parser{}, __parsed_args{parsed_argument::empty(argc, argv)},
-      __help{__identity.description} {}
+      __help{__identity.description} {
+      add_help_argument();
+    }
 
     std::string_view help_text() const noexcept {
       return __help;
@@ -93,14 +136,23 @@ namespace moderna::cli {
       __help = std::move(v);
       return *this;
     }
+
+    /*
+      add a positional argument, accepts one boolean parameter to indicate if help information
+      should automatically be added.
+    */
+    template <class T>
+      requires(std::same_as<T, bool>)
+    position_argument &add_argument(T v = true) {
+      auto &arg = __parser.add_argument();
+      if (v) add_help_argument();
+      return arg;
+    }
     /*
       Adds argument into the parser. This mirrors the call signature for
       argument_parser::add_argument
     */
-    auto &add_argument() {
-      return __parser.add_argument();
-    }
-    auto &add_argument(std::string_view arg_key) {
+    parameter_argument &add_argument(std::string_view arg_key) {
       return __parser.add_argument(argument_key::make_arg(arg_key).value());
     }
     app &add_help_argument(std::string_view help_text = "Show help information") {
@@ -144,12 +196,100 @@ namespace moderna::cli {
       function itself. Call this on subsequent parses after parsing for the first time with argc and
       argv.
     */
-    parse_result parse_argument() {
-      return __parser.parse(__parsed_args)
-        .transform_error([&](auto &&e) {
-          return parse_result{std::cref(*this), std::move(e)};
-        })
-        .error_or(parse_result{std::cref(*this), std::nullopt});
+    struct parse_argument_arg {
+      bool auto_help = true;
+      bool auto_exit = true;
+      bool is_final = true;
+    };
+    parse_result parse_argument(parse_argument_arg arg = parse_argument_arg{true, true, true}) {
+      auto res =
+        __parser.parse(__parsed_args)
+          .transform_error([&](auto &&e) { return parse_result{std::cref(*this), std::move(e)}; })
+          .error_or(parse_result{std::cref(*this), std::nullopt});
+      if (arg.auto_help) res.exit_on_help();
+      if (arg.auto_exit) res.exit_on_error();
+      if (arg.is_final) res.assert_final();
+      return res;
+    }
+    template <class... Args>
+    void error(int return_code, std::format_string<Args...> fmt, Args &&...args) const {
+      std::println(stderr, fmt, std::forward<Args>(args)...);
+      exit(return_code);
+    }
+    template <class T, class E, typename... Args>
+      requires(std::constructible_from<std::string_view, decltype(std::declval<E>().what())>)
+    T test_expected(
+      std::expected<T, E> res,
+      int return_code,
+      std::format_string<std::string_view, Args...> fmt,
+      Args &&...args
+    ) const {
+      if (res) {
+        if constexpr (std::same_as<T, void>) {
+          return;
+        } else {
+          return std::move(res.value());
+        }
+      } else {
+        error(return_code, fmt, std::string_view{res.error().what()}, std::forward<Args>(args)...);
+        throw;
+      }
+    }
+    template <class... Args> void warn(std::format_string<Args...> fmt, Args &&...args) {
+      std::println(stderr, fmt, std::forward<Args>(args)...);
+    }
+    template <class... Args> void out(std::format_string<Args...> fmt, Args &&...args) {
+      std::println(stdout, fmt, std::forward<Args>(args)...);
+    }
+  };
+
+  export struct app_action {
+    std::string option;
+    std::string description;
+    std::function<void(app &)> action;
+
+    argument_option to_option() const {
+      return argument_option{option, description};
+    }
+  };
+  export class app_actions {
+    std::vector<app_action> __actions;
+
+  public:
+    app_actions() {}
+    template <std::invocable<app &> F>
+    std::optional<std::reference_wrapper<const app_action>> add_action(
+      std::string_view option, std::string_view description, F &&action
+    ) {
+      auto act = get_action(option);
+      if (act) return std::nullopt;
+      auto &added_action = __actions.emplace_back(
+        std::string{option}, std::string{description}, std::forward<F>(action)
+      );
+      return std::cref(added_action);
+    }
+    std::optional<std::reference_wrapper<const app_action>> get_action(std::string_view option) {
+      auto action = std::ranges::find(__actions, option, &app_action::option);
+      if (action == __actions.end()) return std::nullopt;
+      return std::cref(*action);
+    }
+
+    void apply_and_run(app &cli_app) {
+      auto &arg = cli_app.add_argument(false).help("Action to perform");
+      arg.options = std::vector<argument_option>{};
+      arg.options->reserve(__actions.size());
+      auto option_inserter = std::back_inserter(arg.options.value());
+      std::ranges::transform(__actions, option_inserter, &app_action::to_option);
+      cli_app.parse_argument({.is_final = false});
+      auto arg_option = cli_app.arguments().current_positional();
+      cli_app.add_help_argument();
+      auto action = get_action(arg_option);
+      if (!action) {
+        cli_app.error(1, "Error: No such action \"{}\"", arg_option);
+      } else {
+        cli_app.help(action->get().description);
+        action->get().action(cli_app);
+      }
     }
   };
 }

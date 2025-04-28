@@ -12,6 +12,7 @@ import :argument_value;
 import :argument_key;
 import :raw_argument;
 import :argument_parser_error;
+import :app_version;
 
 namespace moderna::cli {
   struct parameter_argument {
@@ -47,20 +48,25 @@ namespace moderna::cli {
     }
   };
 
+  export struct argument_option {
+    std::string option;
+    std::optional<std::string> help_text = std::nullopt;
+  };
+
   struct position_argument {
     std::optional<std::string> help_text;
-    std::optional<std::vector<std::string>> options;
+    std::optional<std::vector<argument_option>> options;
 
     template <typename... Args>
-      requires(std::is_constructible_v<std::vector<std::string>, Args...>)
+      requires(std::is_constructible_v<std::vector<argument_option>, Args...>)
     position_argument &set_options(Args &&...args) noexcept {
-      options.emplace(std::vector<std::string>{std::forward<Args>(args)...});
+      options.emplace(std::vector<argument_option>{std::forward<Args>(args)...});
       return *this;
     }
     template <typename... Args>
-      requires(std::is_constructible_v<std::string, Args> && ...)
+      requires(std::is_constructible_v<argument_option, Args> && ...)
     position_argument &set_options(Args &&...args) noexcept {
-      options.emplace(std::vector<std::string>{{std::string{std::forward<Args>(args)}...}});
+      options.emplace(std::vector<argument_option>{{argument_option{std::forward<Args>(args)}...}});
       return *this;
     }
 
@@ -96,7 +102,7 @@ namespace moderna::cli {
         arg_value = std::string_view{equal_it + 1, cur.end()};
       }
       argument_match_type t = arg.key.match(arg_key);
-      return t != argument_match_type::nothing;
+      return t != argument_match_type::nothing && t != argument_match_type::merged;
     }
 
     std::expected<std::reference_wrapper<raw_argument_iterator>, argument_parser_error> parse(
@@ -108,9 +114,10 @@ namespace moderna::cli {
       if (arg.require_value && !arg_value) {
         cur++;
         if (cur == end) {
-          return std::unexpected{
-            argument_parser_error{argument_parser_error_type::no_value_given, ""}
-          };
+          return std::unexpected{argument_parser_error{
+            argument_parser_error_type::no_value_given,
+            std::format("argument {} have no value", arg.key.value())
+          }};
         }
         arg_value = *cur;
       }
@@ -164,9 +171,11 @@ namespace moderna::cli {
       const raw_argument_iterator &end
     ) {
       if (arg.options) {
-        auto option = std::ranges::find_if(arg.options.value(), [&](const std::string &opt) {
-          return opt == *cur;
-        });
+        auto option = std::ranges::find_if(
+          arg.options.value(),
+          [&](const std::string &opt) { return opt == *cur; },
+          &argument_option::option
+        );
         if (option == arg.options->end()) {
           return std::unexpected{
             argument_parser_error{argument_parser_error_type::invalid_value, ""}

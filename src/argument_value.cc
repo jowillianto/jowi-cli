@@ -23,34 +23,39 @@ namespace moderna::cli {
     constexpr parametric_arguments() : __values{} {}
 
     /*
-      Add an argument into the parametric argument list.
+      Add an argument into the parametric argument list. This is reminiscent of the builder pattern.
     */
     constexpr parametric_arguments &add_argument(parametric_argument arg) {
-      __values.emplace_back(arg);
+      __values.emplace_back(std::move(arg));
       return *this;
     }
     /*
       Find a parametric argument given the invocable F to filter.
     */
-    template <std::invocable<const parametric_argument &> F>
-    constexpr std::optional<std::reference_wrapper<const parametric_argument>> find(F &&f
+    constexpr std::optional<std::string_view> first_of(
+      const is_comparable_with<argument_key> auto &key
     ) const noexcept {
-      auto it = std::ranges::find_if(__values, std::forward<F>(f));
+      auto it = std::ranges::find_if(__values, [&](const parametric_argument &arg) {
+        return arg.key == key;
+      });
       if (it == __values.end()) return std::nullopt;
-      return std::cref(*it);
+      else
+        return it->value;
     }
     /*
       Filter based on the invocable F
     */
-    template <std::invocable<const parametric_argument &> F>
-    constexpr auto filter(F &&f) const noexcept {
-      return std::ranges::filter_view(__values, std::forward<F>(f));
+    template <is_comparable_with<argument_key> T>
+    constexpr auto filter(const T &key) const noexcept {
+      return std::ranges::filter_view(__values, [&](const parametric_argument &arg) {
+        return arg.key == key;
+      });
     }
     /*
       Check if the current parametric argument contains argument key
     */
     constexpr bool contains(const is_comparable_with<argument_key> auto &key) const noexcept {
-      return find([&](const parametric_argument &arg) { return arg.key == key; }).has_value();
+      return first_of(key).has_value();
     }
     /*
       Count the number of arguments under the argument_key
@@ -59,12 +64,6 @@ namespace moderna::cli {
       return std::ranges::count_if(__values, [&](const parametric_argument &arg) {
         return arg.key == key;
       });
-    }
-    /*
-      Gets the first entry
-    */
-    constexpr auto first(const is_comparable_with<argument_key> auto &key) const noexcept {
-      return find([&](const parametric_argument &arg) { return arg.key == key; });
     }
     /*
       Checks if the current argument is empty
@@ -135,8 +134,12 @@ namespace moderna::cli {
     bool contains(const is_comparable_with<argument_key> auto &k) const noexcept {
       return current_parameters().contains(k);
     }
-    auto first(const is_comparable_with<argument_key> auto &k) const noexcept {
-      return current_parameters().first(k);
+    std::optional<std::string_view> first_of(const is_comparable_with<argument_key> auto &k
+    ) const noexcept {
+      return current_parameters().first_of(k);
+    };
+    template <typename... Args> auto filter(Args &&...args) const noexcept {
+      return current_parameters().filter(std::forward<Args>(args)...);
     }
 
     constexpr auto begin() const noexcept {

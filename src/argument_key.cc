@@ -52,14 +52,18 @@ namespace moderna::cli {
         return std::nullopt;
       }
     }
-    friend constexpr bool operator==(const argument_key &l, const argument_key &r) {
-      return l.__value == r.__value;
-    }
 
-    template <class T>
-      requires(!std::same_as<T, argument_key> && is_comparable_with<std::string, T>)
-    friend constexpr bool operator==(const argument_key &l, const T &r) {
-      return l.__value == r;
+    /*
+      Over here, template is used to assert that there will be no implicit conversion occurring.
+    */
+    template <class T> friend constexpr bool operator==(const argument_key &l, const T &r) {
+      if constexpr (std::same_as<T, argument_key>) {
+        return l.__value == r.__value;
+      } else if constexpr (is_comparable_with<T, std::string>) {
+        return l.__value == r;
+      } else {
+        static_assert(false, "No comparison operation available");
+      }
     }
   };
 }
