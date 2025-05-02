@@ -6,7 +6,9 @@ module;
 #include <optional>
 #include <print>
 #include <string>
+#include <string_view>
 export module moderna.cli:app;
+import moderna.generic;
 import :argument_parser;
 import :argument_value;
 import :argument_parser_error;
@@ -14,6 +16,7 @@ import :app_version;
 import :app_identity;
 import :argument;
 import :argument_key;
+
 namespace moderna::cli {
   struct help_formatter {
     bool include_app_id = true;
@@ -76,9 +79,8 @@ namespace moderna::cli {
       }
       return it;
     }
-  };
-
-  export struct app_option;
+  }; 
+  
   export class app {
     struct parse_result {
       std::reference_wrapper<const app> app_ref;
@@ -216,10 +218,9 @@ namespace moderna::cli {
       std::println(stderr, fmt, std::forward<Args>(args)...);
       exit(return_code);
     }
-    template <class T, class E, typename... Args>
-      requires(std::constructible_from<std::string_view, decltype(std::declval<E>().what())>)
+    template <class T, generic::is_whatable_error E, typename... Args>
     T test_expected(
-      std::expected<T, E> res,
+      std::expected<T, E> &&res,
       int return_code,
       std::format_string<std::string_view, Args...> fmt,
       Args &&...args
@@ -228,10 +229,12 @@ namespace moderna::cli {
         if constexpr (std::same_as<T, void>) {
           return;
         } else {
-          return std::move(res.value());
+          return res.value();
         }
       } else {
-        error(return_code, fmt, std::string_view{res.error().what()}, std::forward<Args>(args)...);
+        error(
+          return_code, fmt, generic::make_error_message(res.error()), std::forward<Args>(args)...
+        );
         throw;
       }
     }
@@ -240,56 +243,6 @@ namespace moderna::cli {
     }
     template <class... Args> void out(std::format_string<Args...> fmt, Args &&...args) {
       std::println(stdout, fmt, std::forward<Args>(args)...);
-    }
-  };
-
-  export struct app_action {
-    std::string option;
-    std::string description;
-    std::function<void(app &)> action;
-
-    argument_option to_option() const {
-      return argument_option{option, description};
-    }
-  };
-  export class app_actions {
-    std::vector<app_action> __actions;
-
-  public:
-    app_actions() {}
-    template <std::invocable<app &> F>
-    std::optional<std::reference_wrapper<const app_action>> add_action(
-      std::string_view option, std::string_view description, F &&action
-    ) {
-      auto act = get_action(option);
-      if (act) return std::nullopt;
-      auto &added_action = __actions.emplace_back(
-        std::string{option}, std::string{description}, std::forward<F>(action)
-      );
-      return std::cref(added_action);
-    }
-    std::optional<std::reference_wrapper<const app_action>> get_action(std::string_view option) {
-      auto action = std::ranges::find(__actions, option, &app_action::option);
-      if (action == __actions.end()) return std::nullopt;
-      return std::cref(*action);
-    }
-
-    void apply_and_run(app &cli_app) {
-      auto &arg = cli_app.add_argument(false).help("Action to perform");
-      arg.options = std::vector<argument_option>{};
-      arg.options->reserve(__actions.size());
-      auto option_inserter = std::back_inserter(arg.options.value());
-      std::ranges::transform(__actions, option_inserter, &app_action::to_option);
-      cli_app.parse_argument({.is_final = false});
-      auto arg_option = cli_app.arguments().current_positional();
-      cli_app.add_help_argument();
-      auto action = get_action(arg_option);
-      if (!action) {
-        cli_app.error(1, "Error: No such action \"{}\"", arg_option);
-      } else {
-        cli_app.help(action->get().description);
-        action->get().action(cli_app);
-      }
     }
   };
 }

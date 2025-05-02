@@ -1,6 +1,6 @@
 module;
 #include <optional>
-#include <string>
+#include <ranges>
 export module moderna.cli:parsed_argument;
 import :argument_value;
 import :raw_argument;
@@ -96,6 +96,12 @@ namespace moderna::cli {
     */
     constexpr size_t count(const is_comparable_with<argument_key> auto &key) const noexcept {
       return args().count(key);
+    }
+    /*
+      Filter
+    */
+    constexpr auto filter(const is_comparable_with<argument_key> auto &key) const noexcept {
+      return std::ranges::transform_view{args().filter(key), &parametric_argument::value};
     }
 
     /*

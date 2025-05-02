@@ -8,3 +8,4 @@ export import :argument;
 export import :app;
 export import :app_version;
 export import :app_identity;
+export import :app_actions;
