@@ -3,19 +3,45 @@ module;
 #include <expected>
 #include <format>
 #include <optional>
-#include <ranges>
 #include <string>
 #include <string_view>
+#include <vector>
 export module moderna.cli:argument;
 import moderna.generic;
 import :argument_value;
 import :argument_key;
 import :raw_argument;
 import :argument_parser_error;
-import :app_version;
+import :parsed_argument;
 
 namespace moderna::cli {
-  struct parameter_argument {
+
+  export template <class argument_parser_type>
+  concept is_argument_parser = requires(
+    argument_parser_type parser,
+    parsed_argument &values,
+    const parsed_argument &const_values,
+    const raw_argument_iterator &const_it,
+    raw_argument_iterator &it
+  ) {
+    { parser.use_parser(const_it) } -> std::same_as<bool>;
+    { parser.parse(values, it) } -> std::same_as<std::expected<void, argument_parser_error>>;
+    { parser.finalize(const_values) } -> std::same_as<std::expected<void, argument_parser_error>>;
+  };
+  export template <class argument_type>
+  concept is_parametric_argument = requires(const argument_type argument) {
+    { argument.get_key() } -> std::same_as<const argument_key &>;
+    { argument.get_help() } -> std::same_as<std::optional<std::string_view>>;
+    { argument.get_parser() } -> is_argument_parser;
+  };
+  export template <class argument_type>
+  concept is_positional_argument = requires(const argument_type argument) {
+    { argument.get_help() } -> std::same_as<std::optional<std::string_view>>;
+    { argument.get_parser() } -> is_argument_parser;
+    std::is_default_constructible_v<argument_type>;
+  };
+
+  export struct parameter_argument {
     argument_key key;
     bool is_required = false;
     bool require_value = true;
@@ -46,150 +72,206 @@ namespace moderna::cli {
       help_text = std::string{v};
       return *this;
     }
-  };
+    /*
+      parameter_argument_parser declaration
+    */
+    struct parser {
+      std::reference_wrapper<const parameter_argument> arg;
+      std::string_view arg_key;
+      std::optional<std::string_view> arg_value = std::nullopt;
+      bool use_parser(const raw_argument_iterator &it) {
+        std::string_view cur = *it;
+        auto equal_it = std::ranges::find(cur, '=');
+        arg_key = std::string_view{cur.begin(), equal_it};
+        if (equal_it != cur.end()) {
+          arg_value = std::string_view{equal_it + 1, cur.end()};
+        }
+        argument_match_type t = arg.get().key.match(arg_key);
+        return t != argument_match_type::nothing && t != argument_match_type::merged;
+      }
+      std::expected<void, argument_parser_error> parse(
+        parsed_argument &values, raw_argument_iterator &it
+      ) {
+        if (arg.get().require_value && !arg_value) {
+          it++;
+          if (it.is_end()) {
+            return std::unexpected{argument_parser_error{
+              argument_parser_error_type::no_value_given,
+              std::format("argument {} have no value", arg.get().key.value())
+            }};
+          }
+          arg_value = *it;
+        }
+        // Now check if value verifies criteria.
+        if (arg.get().require_value) {
+          values.add_argument(arg.get().key, arg_value.value());
+        } else {
+          values.add_argument(arg.get().key, "");
+        }
+        auto arg_count = values.count(arg.get().key);
+        it++;
+        return {};
+      }
+      std::expected<void, argument_parser_error> finalize(const parsed_argument &values) {
+        const auto arg_count = values.count(arg.get().key);
+        if (arg_count == 0 && arg.get().is_required) {
+          return std::unexpected{argument_parser_error{
+            argument_parser_error_type::no_value_given,
+            std::format("No value given for argument {}", arg.get().key.value())
+          }};
+        } else if (arg_count > arg.get().max_size) {
+          return std::unexpected{argument_parser_error{
+            argument_parser_error_type::too_many_value_given,
+            std::format(
+              "argument {} can only accept {} values but received {}",
+              arg.get().key.value(),
+              arg.get().max_size,
+              arg_count
+            )
+          }};
+        }
+        return {};
+      }
+    };
 
-  export struct argument_option {
-    std::string option;
-    std::optional<std::string> help_text = std::nullopt;
+    /*
+      Concept Satisfaction
+    */
+    const argument_key &get_key() const noexcept {
+      return key;
+    }
+    std::optional<std::string_view> get_help() const noexcept {
+      return help_text;
+    }
+    parser get_parser() const noexcept {
+      return parser{std::cref(*this)};
+    }
   };
+  using parameter_argument_parser = parameter_argument::parser;
+  static_assert(is_argument_parser<parameter_argument_parser>);
+  static_assert(is_parametric_argument<parameter_argument>);
 
-  struct position_argument {
+  export struct basic_position_argument {
     std::optional<std::string> help_text;
-    std::optional<std::vector<argument_option>> options;
-
-    template <typename... Args>
-      requires(std::is_constructible_v<std::vector<argument_option>, Args...>)
-    position_argument &set_options(Args &&...args) noexcept {
-      options.emplace(std::vector<argument_option>{std::forward<Args>(args)...});
-      return *this;
-    }
-    template <typename... Args>
-      requires(std::is_constructible_v<argument_option, Args> && ...)
-    position_argument &set_options(Args &&...args) noexcept {
-      options.emplace(std::vector<argument_option>{{argument_option{std::forward<Args>(args)}...}});
-      return *this;
-    }
-
-    position_argument &help(std::string_view v) noexcept {
+    basic_position_argument &help(std::string_view v) noexcept {
       help_text = std::string{v};
       return *this;
     }
-  };
 
-  template <class T> struct iterative_argument_parser {
-    constexpr bool try_parse(const T &arg, raw_argument_iterator &it) = delete;
-    constexpr std::expected<std::reference_wrapper<raw_argument_iterator>, argument_parser_error>
-    parse(
-      const T &argument,
-      argument_values &values,
-      raw_argument_iterator &cur,
-      const raw_argument_iterator &end
-    ) = delete;
-    constexpr std::optional<argument_parser_error> finalize(
-      const T &argument, const argument_tier &values
-    ) = delete;
-  };
-
-  template <> struct iterative_argument_parser<parameter_argument> {
-    std::string_view arg_key;
-    std::optional<std::string_view> arg_value = std::nullopt;
-
-    constexpr bool try_parse(const parameter_argument &arg, const raw_argument_iterator &it) {
-      std::string_view cur = *it;
-      auto equal_it = std::ranges::find(cur, '=');
-      arg_key = std::string_view{cur.begin(), equal_it};
-      if (equal_it != cur.end()) {
-        arg_value = std::string_view{equal_it + 1, cur.end()};
+    /*
+      Parser specification
+    */
+    struct parser {
+      std::reference_wrapper<const basic_position_argument> arg;
+      constexpr bool use_parser(const raw_argument_iterator &it) {
+        std::string_view cur = *it;
+        if (cur.starts_with('-') || cur.starts_with("--")) {
+          return false;
+        }
+        return true;
       }
-      argument_match_type t = arg.key.match(arg_key);
-      return t != argument_match_type::nothing && t != argument_match_type::merged;
+      std::expected<void, argument_parser_error> parse(
+        parsed_argument &values, raw_argument_iterator &it
+      ) {
+        values.add_argument(*it);
+        it++;
+        return {};
+      }
+      static std::expected<void, argument_parser_error> finalize(const parsed_argument &values) {
+        return {};
+      }
+    };
+
+    /*
+      Concept Satisfaction
+    */
+    std::optional<std::string_view> get_help() const noexcept {
+      return help_text;
+    }
+    parser get_parser() const noexcept {
+      return parser{std::cref(*this)};
+    }
+  };
+  using basic_position_argument_parser = basic_position_argument::parser;
+  static_assert(is_argument_parser<basic_position_argument_parser>);
+  static_assert(is_positional_argument<basic_position_argument>);
+
+  export template <class option_data> struct argument_option {
+    std::string name;
+    option_data data;
+  };
+  export template <class option_data> struct optioned_position_argument {
+    std::optional<std::string> help_text;
+    std::vector<argument_option<option_data>> options;
+
+    option_data &add_option(std::string name, option_data data) {
+      auto option = argument_option<option_data>{std::move(name), std::move(data)};
+      auto it = std::ranges::find(options, name, &argument_option<option_data>::name);
+      if (it == options.end()) {
+        return options.emplace_back(std::move(option)).data;
+      } else {
+        *it = std::move(option);
+        return it->data;
+      }
+    }
+    std::optional<std::reference_wrapper<const option_data>> get_option(
+      std::string_view name
+    ) const {
+      auto it = std::ranges::find(options, name, &argument_option<option_data>::name);
+      if (it == options.end()) {
+        return std::nullopt;
+      } else {
+        return std::cref(it->data);
+      }
+    }
+    size_t option_size() const noexcept {
+      return options.size();
     }
 
-    std::expected<std::reference_wrapper<raw_argument_iterator>, argument_parser_error> parse(
-      const parameter_argument &arg,
-      argument_values &values,
-      raw_argument_iterator &cur,
-      const raw_argument_iterator &end
-    ) {
-      if (arg.require_value && !arg_value) {
-        cur++;
-        if (cur == end) {
+    optioned_position_argument &help(std::string help) {
+      help_text = std::move(help);
+      return *this;
+    }
+
+    struct parser {
+      std::reference_wrapper<const optioned_position_argument> arg;
+      constexpr bool use_parser(const raw_argument_iterator &it) {
+        std::string_view cur = *it;
+        if (cur.starts_with('-') || cur.starts_with("--")) {
+          return false;
+        }
+        return true;
+      }
+      std::expected<void, argument_parser_error> parse(
+        parsed_argument &values, raw_argument_iterator &it
+      ) {
+        std::string_view value = *it;
+        auto option = arg.get().get_option(value);
+        if (arg.get().option_size() != 0 && !option) {
           return std::unexpected{argument_parser_error{
-            argument_parser_error_type::no_value_given,
-            std::format("argument {} have no value", arg.key.value())
+            argument_parser_error_type::invalid_value,
+            std::format("{} is not part of the available options", value)
           }};
         }
-        arg_value = *cur;
+        values.add_argument(*it);
+        it++;
+        return {};
       }
-      // Now check if value verifies criteria.
-      if (arg.require_value) {
-        values.add_keyword_argument(parametric_argument{.key{arg.key}, .value{*arg_value}});
-      } else {
-        values.add_keyword_argument(parametric_argument{.key{arg.key}, .value{""}});
+      static std::expected<void, argument_parser_error> finalize(const parsed_argument &values) {
+        return {};
       }
-      auto arg_count = values.count(arg.key);
-      cur++;
-      return std::ref(cur);
-    }
+    };
 
-    static std::optional<argument_parser_error> finalize(
-      const parameter_argument &arg, const argument_values &values
-    ) {
-      const auto arg_count = values.count(arg.key);
-      if (arg_count == 0 && arg.is_required) {
-        return argument_parser_error{
-          argument_parser_error_type::no_value_given,
-          std::format("No value given for argument {}", arg.key.value())
-        };
-      } else if (arg_count > arg.max_size) {
-        return argument_parser_error{
-          argument_parser_error_type::too_many_value_given,
-          std::format(
-            "argument {} can only accept {} values but received {}",
-            arg.key.value(),
-            arg.max_size,
-            arg_count
-          )
-        };
-      }
-      return std::nullopt;
+    std::optional<std::string_view> get_help() const noexcept {
+      return help_text;
+    }
+    parser get_parser() const noexcept {
+      return parser{std::cref(*this)};
     }
   };
+  template <class option_data>
+  using optioned_position_argument_parser = optioned_position_argument<option_data>::parser;
 
-  template <> struct iterative_argument_parser<position_argument> {
-    constexpr bool try_parse(const position_argument &arg, const raw_argument_iterator &it) {
-      std::string_view cur = *it;
-      if (cur.starts_with('-') || cur.starts_with("--")) {
-        return false;
-      }
-      return true;
-    }
-    std::expected<std::reference_wrapper<raw_argument_iterator>, argument_parser_error> parse(
-      const position_argument &arg,
-      argument_values &values,
-      raw_argument_iterator &cur,
-      const raw_argument_iterator &end
-    ) {
-      if (arg.options) {
-        auto option = std::ranges::find_if(
-          arg.options.value(),
-          [&](const std::string &opt) { return opt == *cur; },
-          &argument_option::option
-        );
-        if (option == arg.options->end()) {
-          return std::unexpected{
-            argument_parser_error{argument_parser_error_type::invalid_value, ""}
-          };
-        }
-      }
-      values.add_positional_argument(*cur);
-      cur++;
-      return std::ref(cur);
-    }
-    static std::optional<argument_parser_error> finalize(
-      const position_argument &arg, argument_values &values
-    ) {
-      return std::nullopt;
-    }
-  };
-}
+  static_assert(is_positional_argument<optioned_position_argument<int>>);
+  static_assert(is_argument_parser<optioned_position_argument_parser<int>>);
+};

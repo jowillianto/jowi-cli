@@ -44,7 +44,7 @@ template <class char_type> struct std::formatter<cli::argument_parser_error_type
   constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
-  auto format(const cli::argument_parser_error_type &v, auto &ctx) const {
+  constexpr auto format(const cli::argument_parser_error_type &v, auto &ctx) const {
     switch (v) {
       case cli::argument_parser_error_type::invalid_value:
         std::format_to(ctx.out(), "INVALID VALUE");

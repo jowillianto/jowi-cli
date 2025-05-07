@@ -5,11 +5,9 @@ set (CMAKE_CXX_STANDARD_REQUIRED true)
 set (CMAKE_CXX_SCAN_FOR_MODULES true)
 
 option (MODERNA_CLI_BUILD_TESTS "Build Tests" OFF)
+option (MODERNA_CLI_BUILD_PYTHON "Build Python Wrapper" OFF)
 
 if (NOT TARGET ${PROJECT_NAME}) 
-  if (NOT TARGET moderna_generic)
-    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/moderna-generic)
-  endif()
   file(GLOB ${PROJECT_NAME}_src
     ${CMAKE_CURRENT_LIST_DIR}/src/*.cc
     ${CMAKE_CURRENT_LIST_DIR}/src/*/*.cc
@@ -20,6 +18,26 @@ if (NOT TARGET ${PROJECT_NAME})
       FILE_SET CXX_MODULES FILES ${${PROJECT_NAME}_src}
   )
   target_link_libraries(${PROJECT_NAME} PUBLIC moderna_generic)
+endif()
+
+if (NOT TARGET moderna_generic)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/moderna-generic)
+endif()
+
+if (NOT TARGET pybind11_VERSION)
+# find_package (Python 3.12 EXACT COMPONENTS Interpreter Development)
+  find_package(Python3 3.11 EXACT REQUIRED COMPONENTS Interpreter Development)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/pybind11)
+endif()
+
+if (MODERNA_CLI_BUILD_PYTHON)
+  pybind11_add_module(py_moderna_cli ${CMAKE_CURRENT_LIST_DIR}/wrappers/python/moderna/cli.cc)
+  target_link_libraries(py_moderna_cli PRIVATE ${PROJECT_NAME})
+  set_target_properties(py_moderna_cli PROPERTIES
+    OUTPUT_NAME "cli"
+    SUFFIX ".so"
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/wrappers/python/moderna"
+  )
 endif()
 
 if (MODERNA_CLI_BUILD_TESTS) 

@@ -1,48 +1,36 @@
 module;
 #include <optional>
-#include <ranges>
+#include <string_view>
+#include <vector>
 export module moderna.cli:parsed_argument;
 import :argument_value;
 import :raw_argument;
 import :argument_key;
 
 namespace moderna::cli {
-  class parsed_argument {
-    argument_values __values;
+  export class parsed_argument {
+    std::vector<position_argument_value> __values;
     raw_argument_iterator __beg;
     raw_argument_iterator __end;
 
-    parsed_argument(argument_values values, raw_argument_iterator beg, raw_argument_iterator end) :
-      __values{std::move(values)}, __beg{beg}, __end{end} {}
-
-    friend class argument_parser;
-
-  protected:
-    /*
-      These are for friend class access
-    */
-    argument_values &raw_mut_args() noexcept {
-      return __values;
-    }
-    auto &raw_mut_arg_cur() noexcept {
-      return __beg;
-    }
-    auto &raw_mut_arg_end() noexcept {
-      return __end;
-    }
+    parsed_argument(raw_argument_iterator beg, raw_argument_iterator end) :
+      __values{}, __beg{beg}, __end{end} {}
 
   public:
     /*
-      Get internal argument values
+      Add a parameter argument
     */
-    const argument_values &args() const noexcept {
+    constexpr parameter_argument_value &add_argument(argument_key key, std::string_view value) {
+      return __values.back().add_argument(std::move(key), argument_value{value});
+    }
+    constexpr position_argument_value &add_argument(std::string_view argument) {
+      return __values.emplace_back(position_argument_value{argument_value{argument}});
+    }
+    const std::vector<position_argument_value> &args() const noexcept {
       return __values;
     }
     std::string_view current_positional() const noexcept {
-      return __values.current_positional();
-    }
-    const parametric_arguments &parameters() const noexcept {
-      return __values.current_parameters();
+      return __values.back().value();
     }
     auto arg_begin() const noexcept {
       return __values.begin();
@@ -80,28 +68,37 @@ namespace moderna::cli {
     /*
       Getting an argument
     */
-    constexpr std::optional<std::string_view> first_of(
+    constexpr std::optional<argument_value> first_of(
       const is_comparable_with<argument_key> auto &key
     ) const noexcept {
-      return args().first_of(key);
+      return __values.back().first_of(key);
     }
     /*
       Checking existence
     */
     constexpr bool contains(const is_comparable_with<argument_key> auto &key) const noexcept {
-      return args().contains(key);
+      return __values.back().contains(key);
     }
     /*
       Counting amount of modules
     */
     constexpr size_t count(const is_comparable_with<argument_key> auto &key) const noexcept {
-      return args().count(key);
+      return __values.back().count(key);
     }
     /*
       Filter
     */
     constexpr auto filter(const is_comparable_with<argument_key> auto &key) const noexcept {
-      return std::ranges::transform_view{args().filter(key), &parametric_argument::value};
+      return __values.back().filter(key);
+    }
+    position_argument_value &raw_mut_args() noexcept {
+      return __values.back();
+    }
+    auto &raw_mut_arg_cur() noexcept {
+      return __beg;
+    }
+    auto &raw_mut_arg_end() noexcept {
+      return __end;
     }
 
     /*
@@ -109,9 +106,7 @@ namespace moderna::cli {
     */
     static parsed_argument empty(int argc, const char **argv) noexcept {
       return parsed_argument{
-        argument_values{},
-        raw_argument_iterator::begin(argv),
-        raw_argument_iterator::end(argc, argv)
+        raw_argument_iterator::begin(argc, argv), raw_argument_iterator::end(argc, argv)
       };
     }
   };

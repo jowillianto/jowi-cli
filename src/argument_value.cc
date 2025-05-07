@@ -1,6 +1,8 @@
 module;
 #include <algorithm>
+#include <charconv>
 #include <concepts>
+#include <expected>
 #include <format>
 #include <optional>
 #include <ranges>
@@ -8,48 +10,69 @@ module;
 #include <vector>
 export module moderna.cli:argument_value;
 import :argument_key;
+import :argument_parser_error;
+import :app_version;
 import moderna.generic;
 
 namespace moderna::cli {
-  export struct parametric_argument {
+  export template <class T> struct argument_converter {
+    static std::expected<T, argument_parser_error> cast(std::string_view v) = delete;
+  };
+  template <class T>
+  concept has_argument_converter = requires(std::string_view v) {
+    { argument_converter<T>::cast(v) } -> std::same_as<std::expected<T, argument_parser_error>>;
+  };
+  export struct argument_value {
+    std::string_view raw_value;
+
+    operator std::string_view() const noexcept {
+      return raw_value;
+    }
+    template <has_argument_converter T> std::expected<T, argument_parser_error> cast() const {
+      return cast(argument_converter<T>::cast);
+    }
+    template <std::invocable<std::string_view> F> auto cast(F &&f) const {
+      return std::invoke(std::forward<F>(f), raw_value);
+    }
+  };
+  export struct parameter_argument_value {
     argument_key key;
-    std::string_view value;
+    argument_value value;
   };
 
-  export class parametric_arguments {
-    std::vector<parametric_argument> __values;
+  export class position_argument_value {
+    argument_value __value;
+    std::vector<parameter_argument_value> __params;
 
   public:
-    constexpr parametric_arguments() : __values{} {}
-
+    position_argument_value(argument_value v) : __value{std::move(v)} {}
     /*
-      Add an argument into the parametric argument list. This is reminiscent of the builder pattern.
+      Get the current positional argument value
     */
-    constexpr parametric_arguments &add_argument(parametric_argument arg) {
-      __values.emplace_back(std::move(arg));
-      return *this;
+    const argument_value &value() const noexcept {
+      return __value;
     }
     /*
-      Find a parametric argument given the invocable F to filter.
+      Add a parameter argument
     */
-    constexpr std::optional<std::string_view> first_of(
+    constexpr parameter_argument_value &add_argument(argument_key key, argument_value value) {
+      return __params.emplace_back(std::move(key), std::move(value));
+    }
+    /*
+      Get the first entry of a certain key
+    */
+    constexpr std::optional<argument_value> first_of(
       const is_comparable_with<argument_key> auto &key
     ) const noexcept {
-      auto it = std::ranges::find_if(__values, [&](const parametric_argument &arg) {
-        return arg.key == key;
-      });
-      if (it == __values.end()) return std::nullopt;
-      else
-        return it->value;
+      auto it = std::ranges::find_if(__params, [&](const auto &arg) { return arg.key == key; });
+      if (it == __params.end()) return std::nullopt;
+      return it->value;
     }
     /*
-      Filter based on the invocable F
+      Get the boolean value for a flag.
     */
-    template <is_comparable_with<argument_key> T>
-    constexpr auto filter(const T &key) const noexcept {
-      return std::ranges::filter_view(__values, [&](const parametric_argument &arg) {
-        return arg.key == key;
-      });
+    bool get_flag(const is_comparable_with<argument_key> auto &key) const noexcept {
+      return contains(key);
     }
     /*
       Check if the current parametric argument contains argument key
@@ -61,118 +84,85 @@ namespace moderna::cli {
       Count the number of arguments under the argument_key
     */
     constexpr size_t count(const is_comparable_with<argument_key> auto &key) const noexcept {
-      return std::ranges::count_if(__values, [&](const parametric_argument &arg) {
+      return std::ranges::count_if(__params, [&](const parameter_argument_value &arg) {
         return arg.key == key;
       });
+    }
+    /*
+      Filter for certain keys
+    */
+    constexpr auto filter(const is_comparable_with<argument_key> auto &key) const noexcept {
+      return std::ranges::transform_view{
+        std::ranges::filter_view(__params, [&](const auto &arg) { return arg.key == key; }),
+        &parameter_argument_value::value
+      };
     }
     /*
       Checks if the current argument is empty
     */
     constexpr bool is_empty() const noexcept {
-      return __values.empty();
+      return __params.empty();
     }
     /*
       Iterators
     */
     constexpr auto begin() const noexcept {
-      return __values.begin();
+      return __params.begin();
     }
     constexpr auto end() const noexcept {
-      return __values.end();
-    }
-  };
-
-  export struct argument_tier {
-    parametric_arguments parameters;
-    std::string_view positional_argument;
-
-    static argument_tier make_empty(std::string_view arg) {
-      return argument_tier{parametric_arguments{}, arg};
-    }
-  };
-
-  export class argument_values {
-    std::vector<argument_tier> __arguments;
-
-  public:
-    argument_values &add_keyword_argument(parametric_argument arg) {
-      __arguments.back().parameters.add_argument(std::move(arg));
-      return *this;
-    }
-    argument_values &add_positional_argument(std::string_view v) {
-      __arguments.emplace_back(argument_tier::make_empty(v));
-      return *this;
-    }
-    const parametric_arguments &current_parameters() const {
-      return __arguments.back().parameters;
-    }
-    std::string_view current_positional() const {
-      return __arguments.back().positional_argument;
-    }
-    size_t current_tier() const {
-      return __arguments.size() - 1;
-    }
-
-    /*
-      Reading Arguments
-    */
-    std::optional<std::reference_wrapper<const argument_tier>> operator[](size_t id
-    ) const noexcept {
-      if (id < __arguments.size()) {
-        return std::cref(__arguments[id]);
-      } else {
-        return std::nullopt;
-      }
-    }
-
-    /*
-      Reading positional arguments
-    */
-    size_t count(const is_comparable_with<argument_key> auto &k) const noexcept {
-      return current_parameters().count(k);
-    }
-    bool contains(const is_comparable_with<argument_key> auto &k) const noexcept {
-      return current_parameters().contains(k);
-    }
-    std::optional<std::string_view> first_of(const is_comparable_with<argument_key> auto &k
-    ) const noexcept {
-      return current_parameters().first_of(k);
-    };
-    template <typename... Args> auto filter(Args &&...args) const noexcept {
-      return current_parameters().filter(std::forward<Args>(args)...);
-    }
-
-    constexpr auto begin() const noexcept {
-      return __arguments.begin();
-    }
-    constexpr auto end() const noexcept {
-      return __arguments.end();
-    }
-    size_t size() const noexcept {
-      return __arguments.size();
+      return __params.end();
     }
   };
 }
 
 namespace cli = moderna::cli;
 
-template <class char_type> struct std::formatter<cli::argument_values, char_type> {
+template <class T>
+  requires(std::is_constructible_v<T, std::string_view> || std::is_constructible_v<T, const char *>)
+struct cli::argument_converter<T> {
+  static std::expected<T, cli::argument_parser_error> cast(std::string_view v) {
+    if constexpr (std::is_constructible_v<T, std::string_view>) {
+      return T{v};
+    } else {
+      return T{v.data()};
+    }
+  }
+};
+template <class number_type>
+  requires(std::integral<number_type> || std::floating_point<number_type>)
+struct cli::argument_converter<number_type> {
+  static std::expected<number_type, cli::argument_parser_error> cast(std::string_view v) {
+    number_type num;
+    auto ec = std::from_chars(v.begin(), v.end(), num);
+    if (ec.ec == std::errc{}) {
+      return num;
+    } else {
+      return std::unexpected{cli::argument_parser_error{
+        cli::argument_parser_error_type::invalid_value, std::format("{} is not a number", v)
+      }};
+    }
+  }
+};
+
+template <> struct cli::argument_converter<cli::app_version> {
+  static std::expected<app_version, cli::argument_parser_error> cast(std::string_view v) {
+    auto version = cli::app_version::from_string(v);
+    if (version) {
+      return version.value();
+    } else {
+      return std::unexpected{cli::argument_parser_error{
+        cli::argument_parser_error_type::invalid_value,
+        std::format("{} is an invalid version string", v)
+      }};
+    }
+  }
+};
+
+template <class char_type> struct std::formatter<cli::argument_value, char_type> {
   constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
-  constexpr auto format(const cli::argument_values &tiers, auto &ctx) const {
-    for (auto tier = tiers.begin(); tier != tiers.end(); tier += 1) {
-      std::format_to(
-        ctx.out(), "{}| {}\n", std::distance(tiers.begin(), tier), tier->positional_argument
-      );
-      for (auto i = tier->parameters.begin(); i != tier->parameters.end(); i++) {
-        if (i->value.empty()) {
-          std::format_to(ctx.out(), "   {}\n", i->key.value());
-        } else {
-          std::format_to(ctx.out(), "   {}={}\n", i->key.value(), i->value);
-        }
-      }
-    }
-    return ctx.out();
+  constexpr auto format(const cli::argument_value &v, auto &ctx) const {
+    return std::format_to(ctx.out(), "{}", v.raw_value);
   }
 };

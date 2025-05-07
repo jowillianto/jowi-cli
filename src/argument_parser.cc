@@ -2,7 +2,6 @@ module;
 #include <expected>
 #include <format>
 #include <functional>
-#include <optional>
 #include <vector>
 export module moderna.cli:argument_parser;
 import moderna.generic;
@@ -14,13 +13,19 @@ import :argument_key;
 import :parsed_argument;
 
 namespace moderna::cli {
+  template <
+    is_positional_argument position_argument_type,
+    is_parametric_argument parameter_argument_type>
   struct argument_declaration {
+    position_argument_type positional;
     std::vector<parameter_argument> parameters;
-    position_argument positional;
   };
 
-  export class argument_parser {
-    std::vector<argument_declaration> __tiers;
+  export template <
+    is_positional_argument position_argument_type,
+    is_parametric_argument parameter_argument_type>
+  class argument_parser {
+    std::vector<argument_declaration<position_argument_type, parameter_argument_type>> __tiers;
 
     // Gets the start of the parsing point
     auto __parse_beg(parsed_argument &prev_result) const {
@@ -31,21 +36,30 @@ namespace moderna::cli {
     }
     // Check is the current tier requires parsing.
     bool __parse_tier(
-      std::vector<argument_declaration>::const_iterator tier, parsed_argument &prev_result
+      std::vector<
+        argument_declaration<position_argument_type, parameter_argument_type>>::const_iterator tier,
+      parsed_argument &prev_result
     ) {
       auto current_tier = std::distance(__tiers.cbegin(), tier) + 1;
       return prev_result.tier() < current_tier;
     }
 
   public:
-    argument_parser() {
-      add_argument();
+    argument_parser() : __tiers{} {}
+    parameter_argument_type &add_argument(argument_key key) {
+      return __tiers.back().parameters.emplace_back(parameter_argument_type{std::move(key)});
     }
-    parameter_argument &add_argument(argument_key key) {
-      return __tiers.back().parameters.emplace_back(parameter_argument{std::move(key)});
+    position_argument_type &add_argument() {
+      auto &tier = __tiers.emplace_back(
+        argument_declaration<position_argument_type, parameter_argument_type>{
+          position_argument_type{}, {}
+        }
+      );
+      return tier.positional;
     }
-    position_argument &add_argument() {
-      return __tiers.emplace_back(argument_declaration{{}, position_argument{}}).positional;
+
+    position_argument_type &positional() {
+      return __tiers.back().positional;
     }
 
     std::expected<parsed_argument, argument_parser_error> parse(int argc, const char **argv) {
@@ -58,22 +72,17 @@ namespace moderna::cli {
       // Start parsing from the current tier.
       // Meaning:
       for (auto tier = __parse_beg(prev_result); tier != __tiers.cend(); tier += 1) {
-        // If the previous tier have already been parsed
+        position_argument_type pos_arg = tier->positional;
         if (__parse_tier(tier, prev_result)) {
-          auto parser = iterative_argument_parser<position_argument>{};
-          bool use_parser = parser.try_parse(tier->positional, prev_result.raw_mut_arg_cur());
+          is_argument_parser auto parser = pos_arg.get_parser();
+          bool use_parser = parser.use_parser(prev_result.raw_arg_cur());
           if (!use_parser) {
             return std::unexpected{argument_parser_error{
               argument_parser_error_type::invalid_value,
               std::format("Expected a positional argument at : {}", *prev_result.raw_mut_arg_cur())
             }};
           }
-          auto res = parser.parse(
-            tier->positional,
-            prev_result.raw_mut_args(),
-            prev_result.raw_mut_arg_cur(),
-            prev_result.raw_mut_arg_end()
-          );
+          auto res = parser.parse(prev_result, prev_result.raw_mut_arg_cur());
           if (!res) {
             return std::unexpected{res.error()};
           }
@@ -81,17 +90,12 @@ namespace moderna::cli {
         // Iterate over parameters and parse until there is nothing parseable left.
         while (!prev_result.is_end()) {
           bool have_parseable = false;
-          for (const auto &parameter : tier->parameters) {
-            auto parser = iterative_argument_parser<parameter_argument>{};
-            bool use_parser = parser.try_parse(parameter, prev_result.raw_mut_arg_cur());
+          for (const parameter_argument_type &parameter : tier->parameters) {
+            is_argument_parser auto parser = parameter.get_parser();
+            bool use_parser = parser.use_parser(prev_result.raw_arg_cur());
             have_parseable = use_parser || have_parseable;
             if (use_parser) {
-              auto res = parser.parse(
-                parameter,
-                prev_result.raw_mut_args(),
-                prev_result.raw_mut_arg_cur(),
-                prev_result.raw_mut_arg_end()
-              );
+              auto res = parser.parse(prev_result, prev_result.raw_mut_arg_cur());
               if (!res) {
                 return std::unexpected{res.error()};
               }
@@ -106,11 +110,10 @@ namespace moderna::cli {
         }
 
         // Perform finalization
-        for (const auto &parameter : tier->parameters) {
-          auto err =
-            iterative_argument_parser<parameter_argument>::finalize(parameter, prev_result.args());
-          if (err) {
-            return std::unexpected{err.value()};
+        for (const parameter_argument_type &parameter : tier->parameters) {
+          auto res = parameter.get_parser().finalize(prev_result);
+          if (!res) {
+            return std::unexpected{res.error()};
           }
         }
 
@@ -133,12 +136,6 @@ namespace moderna::cli {
     }
     size_t size() const noexcept {
       return __tiers.size();
-    }
-    std::optional<std::reference_wrapper<const argument_declaration>> operator[](size_t id) {
-      if (id < __tiers.size()) {
-        return std::cref(__tiers[id]);
-      }
-      return std::nullopt;
     }
   };
 }
