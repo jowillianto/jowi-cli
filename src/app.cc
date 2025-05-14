@@ -40,12 +40,14 @@ namespace moderna::cli {
         return *this;
       }
       void run() {
-        app_ref.get().parse_argument({.is_final = false});
+        auto res = app_ref.get().parse_argument({.is_final = false});
         auto selected_option = app_ref.get().arguments().current_positional();
         auto option = app_ref.get().argument_parser().positional().get_option(selected_option);
         if (!option) {
+          res.exit_on_help();
           app_ref.get().error(1, "Error: No such action \"{}\"", selected_option);
         } else {
+          app_ref.get().add_help_argument();
           option->get().action(app_ref.get());
         }
       }
@@ -171,6 +173,22 @@ namespace moderna::cli {
         throw;
       }
     }
+    template <class T, std::formattable<char> E, typename... Args>
+      requires(!generic::is_whatable_error<E>)
+    T test_expected(
+      std::expected<T, E> &&res, int return_code, std::format_string<E, Args...> fmt, Args &&...args
+    ) const {
+      if (res.has_value()) {
+        if constexpr (std::same_as<T, void>) {
+          return;
+        } else {
+          return std::move(res.value());
+        }
+      } else {
+        error(return_code, fmt, std::move(res.error()), std::forward<Args>(args)...);
+        throw;
+      }
+    }
 
     /*
       Parsing and running
@@ -190,7 +208,7 @@ namespace moderna::cli {
       Action Builder
     */
     action_builder build_action(std::string help_text = "") noexcept {
-      add_argument(true).help(std::move(help_text));
+      add_argument(false).help(std::move(help_text));
       return action_builder{std::ref(*this)};
     }
 
