@@ -4,6 +4,3 @@
 [submodule "libs/test-lib"]
 	path = libs/test-lib
 	url = https://github.com/jowillianto/test-lib
-[submodule "libs/pybind11"]
-	path = libs/pybind11
-	url = https://github.com/pybind/pybind11

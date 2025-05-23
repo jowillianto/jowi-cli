@@ -24,22 +24,6 @@ if (NOT TARGET moderna_generic)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/moderna-generic)
 endif()
 
-if (NOT TARGET pybind11_VERSION)
-# find_package (Python 3.12 EXACT COMPONENTS Interpreter Development)
-  find_package(Python3 3.11 EXACT REQUIRED COMPONENTS Interpreter Development)
-  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/pybind11)
-endif()
-
-if (MODERNA_CLI_BUILD_PYTHON)
-  pybind11_add_module(py_moderna_cli ${CMAKE_CURRENT_LIST_DIR}/wrappers/python/moderna/cli.cc)
-  target_link_libraries(py_moderna_cli PRIVATE ${PROJECT_NAME})
-  set_target_properties(py_moderna_cli PROPERTIES
-    OUTPUT_NAME "cli"
-    SUFFIX ".so"
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_LIST_DIR}/wrappers/python/moderna"
-  )
-endif()
-
 if (MODERNA_CLI_BUILD_TESTS) 
   if (NOT TARGET moderna_test_lib)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/test-lib)

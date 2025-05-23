@@ -5,6 +5,7 @@ module;
 #include <functional>
 #include <optional>
 #include <print>
+#include <source_location>
 #include <string>
 #include <string_view>
 export module moderna.cli:app;
@@ -23,6 +24,7 @@ namespace moderna::cli {
     bool auto_exit = true;
     bool is_final = true;
   };
+
   export class app {
   public:
     struct action {
@@ -155,11 +157,11 @@ namespace moderna::cli {
     void inline_out(std::format_string<Args...> fmt, Args &&...args) const {
       std::print(stdout, fmt, std::forward<Args>(args)...);
     }
-    template <class T, generic::is_whatable_error E, typename... Args>
+    template <class T, generic::is_formattable_error E, typename... Args>
     T test_expected(
       std::expected<T, E> &&res,
       int return_code,
-      std::format_string<std::string_view, Args...> fmt,
+      std::format_string<generic::error_formatter, Args...> fmt,
       Args &&...args
     ) const {
       if (res.has_value()) {
@@ -169,25 +171,28 @@ namespace moderna::cli {
           return std::move(res.value());
         }
       } else {
-        error(return_code, fmt, std::string_view{res.error().what()}, std::forward<Args>(args)...);
+        error(return_code, fmt, generic::error_formatter{res.error()}, std::forward<Args>(args)...);
         throw;
       }
     }
-    template <class T, std::formattable<char> E, typename... Args>
-      requires(!generic::is_whatable_error<E>)
+    template <class T, generic::is_formattable_error E>
     T test_expected(
-      std::expected<T, E> &&res, int return_code, std::format_string<E, Args...> fmt, Args &&...args
-    ) const {
-      if (res.has_value()) {
-        if constexpr (std::same_as<T, void>) {
-          return;
-        } else {
-          return std::move(res.value());
-        }
-      } else {
-        error(return_code, fmt, std::move(res.error()), std::forward<Args>(args)...);
-        throw;
-      }
+      std::expected<T, E> &&res,
+      int return_code = 1,
+      std::source_location loc = std::source_location::current()
+    ) {
+      auto full_function_name = std::string_view{loc.function_name()};
+      auto function_name = std::string_view{
+        std::ranges::find(full_function_name, ' ') + 1, std::ranges::find(full_function_name, '(')
+      };
+      return test_expected(
+        std::move(res),
+        return_code,
+        "{2:}: {0:} ({1:}:{3:})",
+        loc.file_name(),
+        function_name,
+        loc.line()
+      );
     }
 
     /*
