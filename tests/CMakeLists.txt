@@ -18,6 +18,3 @@ moderna_add_test(
   LIBRARIES moderna_cli
   SANITIZERS thread address undefined
 )
-
-add_executable(pharmaco_cli ${CMAKE_CURRENT_LIST_DIR}/pharmaco_cli.cc)
-target_link_libraries(pharmaco_cli PUBLIC ${PROJECT_NAME})
