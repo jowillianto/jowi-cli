@@ -140,62 +140,6 @@ namespace moderna::cli {
     }
 
     /*
-      CLI IO
-    */
-    template <class... Args> void warn(std::format_string<Args...> fmt, Args &&...args) const {
-      std::println(stderr, fmt, std::forward<Args>(args)...);
-    }
-    template <class... Args>
-    void error(int return_code, std::format_string<Args...> fmt, Args &&...args) const {
-      std::println(stderr, fmt, std::forward<Args>(args)...);
-      exit(return_code);
-    }
-    template <class... Args> void out(std::format_string<Args...> fmt, Args &&...args) const {
-      std::println(stdout, fmt, std::forward<Args>(args)...);
-    }
-    template <class... Args>
-    void inline_out(std::format_string<Args...> fmt, Args &&...args) const {
-      std::print(stdout, fmt, std::forward<Args>(args)...);
-    }
-    template <class T, generic::is_formattable_error E, typename... Args>
-    T test_expected(
-      std::expected<T, E> &&res,
-      int return_code,
-      std::format_string<generic::error_formatter, Args...> fmt,
-      Args &&...args
-    ) const {
-      if (res.has_value()) {
-        if constexpr (std::same_as<T, void>) {
-          return;
-        } else {
-          return std::move(res.value());
-        }
-      } else {
-        error(return_code, fmt, generic::error_formatter{res.error()}, std::forward<Args>(args)...);
-        throw;
-      }
-    }
-    template <class T, generic::is_formattable_error E>
-    T test_expected(
-      std::expected<T, E> &&res,
-      int return_code = 1,
-      std::source_location loc = std::source_location::current()
-    ) {
-      auto full_function_name = std::string_view{loc.function_name()};
-      auto function_name = std::string_view{
-        std::ranges::find(full_function_name, ' ') + 1, std::ranges::find(full_function_name, '(')
-      };
-      return test_expected(
-        std::move(res),
-        return_code,
-        "{2:}: {0:} ({1:}:{3:})",
-        loc.file_name(),
-        function_name,
-        loc.line()
-      );
-    }
-
-    /*
       Parsing and running
     */
     parse_result parse_argument(app_parser_arg arg = app_parser_arg{true, true, true}) {
@@ -252,6 +196,64 @@ namespace moderna::cli {
           out("{:16} : {}", param.get_key().value(), param.get_help().value_or("<no-help>"));
         }
       }
+    }
+
+    /*
+      CLI Shortcut Functions
+    */
+    template <class... Args>
+    static void warn(std::format_string<Args...> fmt, Args &&...args) {
+      std::println(stderr, fmt, std::forward<Args>(args)...);
+    }
+    template <class... Args>
+    static void error(int return_code, std::format_string<Args...> fmt, Args &&...args) {
+      std::println(stderr, fmt, std::forward<Args>(args)...);
+      exit(return_code);
+    }
+    template <class... Args>
+    static void out(std::format_string<Args...> fmt, Args &&...args) {
+      std::println(stdout, fmt, std::forward<Args>(args)...);
+    }
+    template <class... Args>
+    static void inline_out(std::format_string<Args...> fmt, Args &&...args)  {
+      std::print(stdout, fmt, std::forward<Args>(args)...);
+    }
+    template <class T, generic::is_formattable_error E, typename... Args>
+    static T test_expected(
+      std::expected<T, E> &&res,
+      int return_code,
+      std::format_string<generic::error_formatter, Args...> fmt,
+      Args &&...args
+    ) {
+      if (res.has_value()) {
+        if constexpr (std::same_as<T, void>) {
+          return;
+        } else {
+          return std::move(res.value());
+        }
+      } else {
+        error(return_code, fmt, generic::error_formatter{res.error()}, std::forward<Args>(args)...);
+        throw;
+      }
+    }
+    template <class T, generic::is_formattable_error E>
+    static T test_expected(
+      std::expected<T, E> &&res,
+      int return_code = 1,
+      std::source_location loc = std::source_location::current()
+    ) {
+      auto full_function_name = std::string_view{loc.function_name()};
+      auto function_name = std::string_view{
+        std::ranges::find(full_function_name, ' ') + 1, std::ranges::find(full_function_name, '(')
+      };
+      return test_expected(
+        std::move(res),
+        return_code,
+        "{2:}: {0:} ({1:}:{3:})",
+        loc.file_name(),
+        function_name,
+        loc.line()
+      );
     }
   };
   export using app_action = app::action;
