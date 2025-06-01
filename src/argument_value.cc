@@ -3,6 +3,7 @@ module;
 #include <charconv>
 #include <concepts>
 #include <expected>
+#include <filesystem>
 #include <format>
 #include <optional>
 #include <ranges>
@@ -13,6 +14,7 @@ import :argument_key;
 import :argument_parser_error;
 import :app_version;
 import moderna.generic;
+namespace fs = std::filesystem;
 
 namespace moderna::cli {
   export template <class T> struct argument_converter {
@@ -31,9 +33,18 @@ namespace moderna::cli {
     template <has_argument_converter T> std::expected<T, argument_parser_error> cast() const {
       return cast(argument_converter<T>::cast);
     }
-    template <std::invocable<std::string_view> F> auto cast(F &&f) const {
+    template <std::invocable<std::string_view> F>
+    std::invoke_result_t<F, std::string_view> cast(F &&f) const {
       return std::invoke(std::forward<F>(f), raw_value);
     }
+
+    /*
+      Caster Definition
+    */
+    std::expected<int, argument_parser_error> cast_int() const;
+    std::expected<double, argument_parser_error> cast_double() const;
+    std::string cast_string() const;
+    fs::path cast_path() const;
   };
   export struct parameter_argument_value {
     argument_key key;
@@ -131,7 +142,10 @@ struct cli::argument_converter<T> {
 template <class number_type>
   requires(std::integral<number_type> || std::floating_point<number_type>)
 struct cli::argument_converter<number_type> {
-  static std::expected<number_type, cli::argument_parser_error> cast(std::string_view v) {
+  // Int transform
+  static std::expected<number_type, cli::argument_parser_error> cast(std::string_view v)
+    requires(std::integral<number_type>)
+  {
     number_type num;
     auto ec = std::from_chars(v.begin(), v.end(), num);
     if (ec.ec == std::errc{}) {
@@ -140,6 +154,28 @@ struct cli::argument_converter<number_type> {
       return std::unexpected{cli::argument_parser_error{
         cli::argument_parser_error_type::invalid_value, std::format("{} is not a number", v)
       }};
+    }
+  }
+  // Floating Point Transform
+  static std::expected<number_type, cli::argument_parser_error> cast(std::string_view v)
+    requires(std::floating_point<number_type>)
+  {
+    auto dot = std::ranges::find(v, '.');
+    if (dot == v.end()) {
+      return cli::argument_converter<int>::cast(std::string_view{v.begin(), dot})
+        .transform([](int v) { return float(v); });
+    } else {
+      std::string_view dig_bef_dot{v.begin(), dot};
+      std::string_view dig_aft_dot{dot + 1, std::ranges::find_if(dot + 1, v.end(), [](char x) {
+                                     return !isnumber(x);
+                                   })};
+      return cli::argument_converter<int>::cast(dig_bef_dot).and_then([&](int bef_dot) {
+        return cli::argument_converter<int>::cast(dig_aft_dot).transform([&](int aft_dot) {
+          number_type ten_values = static_cast<number_type>(bef_dot);
+          number_type dec_values = static_cast<number_type>(aft_dot);
+          return ten_values + dec_values / (std::pow(10, dig_aft_dot.length()));
+        });
+      });
     }
   }
 };
@@ -166,3 +202,19 @@ template <class char_type> struct std::formatter<cli::argument_value, char_type>
     return std::format_to(ctx.out(), "{}", v.raw_value);
   }
 };
+
+/*
+  Function Definition
+*/
+std::expected<int, cli::argument_parser_error> cli::argument_value::cast_int() const {
+  return cast<int>();
+}
+std::expected<double, cli::argument_parser_error> cli::argument_value::cast_double() const {
+  return cast<double>();
+}
+std::string cli::argument_value::cast_string() const {
+  return cast<std::string>().value();
+}
+fs::path cli::argument_value::cast_path() const {
+  return cast<fs::path>().value();
+}

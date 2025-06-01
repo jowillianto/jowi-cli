@@ -15,6 +15,13 @@
 moderna_add_test(
   ${PROJECT_NAME}_argument_parser
   ${CMAKE_CURRENT_LIST_DIR}/argument_parser.cc
-  LIBRARIES moderna_cli
-  SANITIZERS thread address undefined
+  LIBRARIES ${PROJECT_NAME}
+  SANITIZERS all
+)
+
+moderna_add_test(
+  ${PROJECT_NAME}_app_version
+  ${CMAKE_CURRENT_LIST_DIR}/app_version.cc
+  LIBRARIES ${PROJECT_NAME}
+  SANITIZERS all
 )
