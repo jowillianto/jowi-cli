@@ -1,6 +1,6 @@
 export module moderna.cli;
 export import :argument_parser;
-export import :argument_parser_error;
+export import :argparse_error;
 export import :argument_key;
 export import :argument_value;
 export import :parsed_argument;

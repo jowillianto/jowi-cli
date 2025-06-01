@@ -3,7 +3,6 @@ module;
 #include <charconv>
 #include <concepts>
 #include <expected>
-#include <filesystem>
 #include <format>
 #include <optional>
 #include <ranges>
@@ -11,18 +10,17 @@ module;
 #include <vector>
 export module moderna.cli:argument_value;
 import :argument_key;
-import :argument_parser_error;
+import :argparse_error;
 import :app_version;
 import moderna.generic;
-namespace fs = std::filesystem;
 
 namespace moderna::cli {
   export template <class T> struct argument_converter {
-    static std::expected<T, argument_parser_error> cast(std::string_view v) = delete;
+    static std::expected<T, argparse_error> cast(std::string_view v) = delete;
   };
   template <class T>
   concept has_argument_converter = requires(std::string_view v) {
-    { argument_converter<T>::cast(v) } -> std::same_as<std::expected<T, argument_parser_error>>;
+    { argument_converter<T>::cast(v) } -> std::same_as<std::expected<T, argparse_error>>;
   };
   export struct argument_value {
     std::string_view raw_value;
@@ -30,7 +28,7 @@ namespace moderna::cli {
     operator std::string_view() const noexcept {
       return raw_value;
     }
-    template <has_argument_converter T> std::expected<T, argument_parser_error> cast() const {
+    template <has_argument_converter T> std::expected<T, argparse_error> cast() const {
       return cast(argument_converter<T>::cast);
     }
     template <std::invocable<std::string_view> F>
@@ -41,10 +39,9 @@ namespace moderna::cli {
     /*
       Caster Definition
     */
-    std::expected<int, argument_parser_error> cast_int() const;
-    std::expected<double, argument_parser_error> cast_double() const;
+    std::expected<int, argparse_error> cast_int() const;
+    std::expected<double, argparse_error> cast_double() const;
     std::string cast_string() const;
-    fs::path cast_path() const;
   };
   export struct parameter_argument_value {
     argument_key key;
@@ -131,7 +128,7 @@ namespace cli = moderna::cli;
 template <class T>
   requires(std::is_constructible_v<T, std::string_view> || std::is_constructible_v<T, const char *>)
 struct cli::argument_converter<T> {
-  static std::expected<T, cli::argument_parser_error> cast(std::string_view v) {
+  static std::expected<T, cli::argparse_error> cast(std::string_view v) {
     if constexpr (std::is_constructible_v<T, std::string_view>) {
       return T{v};
     } else {
@@ -143,7 +140,7 @@ template <class number_type>
   requires(std::integral<number_type> || std::floating_point<number_type>)
 struct cli::argument_converter<number_type> {
   // Int transform
-  static std::expected<number_type, cli::argument_parser_error> cast(std::string_view v)
+  static std::expected<number_type, cli::argparse_error> cast(std::string_view v)
     requires(std::integral<number_type>)
   {
     number_type num;
@@ -151,19 +148,17 @@ struct cli::argument_converter<number_type> {
     if (ec.ec == std::errc{}) {
       return num;
     } else {
-      return std::unexpected{cli::argument_parser_error{
-        cli::argument_parser_error_type::invalid_value, std::format("{} is not a number", v)
-      }};
+      return std::unexpected{cli::argparse_error{cli::argparse_error_type::INVALID_VALUE}};
     }
   }
   // Floating Point Transform
-  static std::expected<number_type, cli::argument_parser_error> cast(std::string_view v)
+  static std::expected<number_type, cli::argparse_error> cast(std::string_view v)
     requires(std::floating_point<number_type>)
   {
     auto dot = std::ranges::find(v, '.');
     if (dot == v.end()) {
       return cli::argument_converter<int>::cast(std::string_view{v.begin(), dot})
-        .transform([](int v) { return float(v); });
+        .transform([](int v) { return number_type(v); });
     } else {
       std::string_view dig_bef_dot{v.begin(), dot};
       std::string_view dig_aft_dot{dot + 1, std::ranges::find_if(dot + 1, v.end(), [](char x) {
@@ -181,15 +176,12 @@ struct cli::argument_converter<number_type> {
 };
 
 template <> struct cli::argument_converter<cli::app_version> {
-  static std::expected<app_version, cli::argument_parser_error> cast(std::string_view v) {
+  static std::expected<app_version, cli::argparse_error> cast(std::string_view v) {
     auto version = cli::app_version::from_string(v);
     if (version) {
       return version.value();
     } else {
-      return std::unexpected{cli::argument_parser_error{
-        cli::argument_parser_error_type::invalid_value,
-        std::format("{} is an invalid version string", v)
-      }};
+      return std::unexpected{cli::argparse_error{cli::argparse_error_type::INVALID_VALUE}};
     }
   }
 };
@@ -206,15 +198,12 @@ template <class char_type> struct std::formatter<cli::argument_value, char_type>
 /*
   Function Definition
 */
-std::expected<int, cli::argument_parser_error> cli::argument_value::cast_int() const {
+std::expected<int, cli::argparse_error> cli::argument_value::cast_int() const {
   return cast<int>();
 }
-std::expected<double, cli::argument_parser_error> cli::argument_value::cast_double() const {
+std::expected<double, cli::argparse_error> cli::argument_value::cast_double() const {
   return cast<double>();
 }
 std::string cli::argument_value::cast_string() const {
   return cast<std::string>().value();
-}
-fs::path cli::argument_value::cast_path() const {
-  return cast<fs::path>().value();
 }

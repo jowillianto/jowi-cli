@@ -8,7 +8,7 @@ import moderna.generic;
 import :argument;
 import :raw_argument;
 import :argument_value;
-import :argument_parser_error;
+import :argparse_error;
 import :argument_key;
 import :parsed_argument;
 
@@ -62,11 +62,11 @@ namespace moderna::cli {
       return __tiers.back().positional;
     }
 
-    std::expected<parsed_argument, argument_parser_error> parse(int argc, const char **argv) {
+    std::expected<parsed_argument, argparse_error> parse(int argc, const char **argv) {
       auto empty_parse_result = parsed_argument::empty(argc, argv);
       return parse(empty_parse_result).transform([&](parsed_argument &r) { return r; });
     }
-    std::expected<std::reference_wrapper<parsed_argument>, argument_parser_error> parse(
+    std::expected<std::reference_wrapper<parsed_argument>, argparse_error> parse(
       parsed_argument &prev_result
     ) {
       // Start parsing from the current tier.
@@ -77,10 +77,7 @@ namespace moderna::cli {
           is_argument_parser auto parser = pos_arg.get_parser();
           bool use_parser = parser.use_parser(prev_result.raw_arg_cur());
           if (!use_parser) {
-            return std::unexpected{argument_parser_error{
-              argument_parser_error_type::invalid_value,
-              std::format("Expected a positional argument at : {}", *prev_result.raw_mut_arg_cur())
-            }};
+            return std::unexpected{argparse_error{argparse_error_type::INVALID_VALUE}};
           }
           auto res = parser.parse(prev_result, prev_result.raw_mut_arg_cur());
           if (!res) {
@@ -123,7 +120,7 @@ namespace moderna::cli {
       }
       return std::ref(prev_result);
     }
-    std::expected<parsed_argument, argument_parser_error> parse(parsed_argument &&res) {
+    std::expected<parsed_argument, argparse_error> parse(parsed_argument &&res) {
       return parse(res).transform([](parsed_argument &res) { return std::move(res); });
     }
 

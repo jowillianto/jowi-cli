@@ -1,7 +1,6 @@
 module;
 #include <algorithm>
 #include <expected>
-#include <format>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -11,7 +10,7 @@ import moderna.generic;
 import :argument_value;
 import :argument_key;
 import :raw_argument;
-import :argument_parser_error;
+import :argparse_error;
 import :parsed_argument;
 
 namespace moderna::cli {
@@ -25,8 +24,8 @@ namespace moderna::cli {
     raw_argument_iterator &it
   ) {
     { parser.use_parser(const_it) } -> std::same_as<bool>;
-    { parser.parse(values, it) } -> std::same_as<std::expected<void, argument_parser_error>>;
-    { parser.finalize(const_values) } -> std::same_as<std::expected<void, argument_parser_error>>;
+    { parser.parse(values, it) } -> std::same_as<std::expected<void, argparse_error>>;
+    { parser.finalize(const_values) } -> std::same_as<std::expected<void, argparse_error>>;
   };
   export template <class argument_type>
   concept is_parametric_argument = requires(const argument_type argument) {
@@ -89,16 +88,13 @@ namespace moderna::cli {
         argument_match_type t = arg.get().key.match(arg_key);
         return t != argument_match_type::nothing && t != argument_match_type::merged;
       }
-      std::expected<void, argument_parser_error> parse(
+      std::expected<void, argparse_error> parse(
         parsed_argument &values, raw_argument_iterator &it
       ) {
         if (arg.get().require_value && !arg_value) {
           it++;
           if (it.is_end()) {
-            return std::unexpected{argument_parser_error{
-              argument_parser_error_type::no_value_given,
-              std::format("argument {} have no value", arg.get().key.value())
-            }};
+            return std::unexpected{argparse_error{argparse_error_type::NO_VALUE_GIVEN}};
           }
           arg_value = *it;
         }
@@ -112,23 +108,12 @@ namespace moderna::cli {
         it++;
         return {};
       }
-      std::expected<void, argument_parser_error> finalize(const parsed_argument &values) {
+      std::expected<void, argparse_error> finalize(const parsed_argument &values) {
         const auto arg_count = values.count(arg.get().key);
         if (arg_count == 0 && arg.get().is_required) {
-          return std::unexpected{argument_parser_error{
-            argument_parser_error_type::no_value_given,
-            std::format("No value given for argument {}", arg.get().key.value())
-          }};
+          return std::unexpected{argparse_error{argparse_error_type::NO_VALUE_GIVEN}};
         } else if (arg_count > arg.get().max_size) {
-          return std::unexpected{argument_parser_error{
-            argument_parser_error_type::too_many_value_given,
-            std::format(
-              "argument {} can only accept {} values but received {}",
-              arg.get().key.value(),
-              arg.get().max_size,
-              arg_count
-            )
-          }};
+          return std::unexpected{argparse_error{argparse_error_type::TOO_MANY_VALUE_GIVEN}};
         }
         return {};
       }
@@ -170,14 +155,14 @@ namespace moderna::cli {
         }
         return true;
       }
-      std::expected<void, argument_parser_error> parse(
+      std::expected<void, argparse_error> parse(
         parsed_argument &values, raw_argument_iterator &it
       ) {
         values.add_argument(*it);
         it++;
         return {};
       }
-      static std::expected<void, argument_parser_error> finalize(const parsed_argument &values) {
+      static std::expected<void, argparse_error> finalize(const parsed_argument &values) {
         return {};
       }
     };
@@ -242,22 +227,19 @@ namespace moderna::cli {
         }
         return true;
       }
-      std::expected<void, argument_parser_error> parse(
+      std::expected<void, argparse_error> parse(
         parsed_argument &values, raw_argument_iterator &it
       ) {
         std::string_view value = *it;
         auto option = arg.get().get_option(value);
         if (arg.get().option_size() != 0 && !option) {
-          return std::unexpected{argument_parser_error{
-            argument_parser_error_type::invalid_value,
-            std::format("{} is not part of the available options", value)
-          }};
+          return std::unexpected{argparse_error{argparse_error_type::INVALID_VALUE}};
         }
         values.add_argument(*it);
         it++;
         return {};
       }
-      static std::expected<void, argument_parser_error> finalize(const parsed_argument &values) {
+      static std::expected<void, argparse_error> finalize(const parsed_argument &values) {
         return {};
       }
     };

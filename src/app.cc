@@ -12,7 +12,7 @@ export module moderna.cli:app;
 import moderna.generic;
 import :argument_parser;
 import :argument_value;
-import :argument_parser_error;
+import :argparse_error;
 import :app_version;
 import :app_identity;
 import :argument;
@@ -56,7 +56,7 @@ namespace moderna::cli {
     };
     struct parse_result {
       std::reference_wrapper<const app> app_ref;
-      std::optional<argument_parser_error> err;
+      std::optional<argparse_error> err;
 
       const parse_result &exit_on_error(bool print_err = true, int err_code = 1) const {
         if (err) {
@@ -118,8 +118,8 @@ namespace moderna::cli {
     const parsed_argument &arguments() const noexcept {
       return __parsed_args;
     }
-    argument_parser<optioned_position_argument<action>, parameter_argument> &argument_parser(
-    ) noexcept {
+    argument_parser<optioned_position_argument<action>, parameter_argument> &
+    argument_parser() noexcept {
       return __parser;
     }
 
@@ -201,8 +201,7 @@ namespace moderna::cli {
     /*
       CLI Shortcut Functions
     */
-    template <class... Args>
-    static void warn(std::format_string<Args...> fmt, Args &&...args) {
+    template <class... Args> static void warn(std::format_string<Args...> fmt, Args &&...args) {
       std::println(stderr, fmt, std::forward<Args>(args)...);
     }
     template <class... Args>
@@ -210,12 +209,11 @@ namespace moderna::cli {
       std::println(stderr, fmt, std::forward<Args>(args)...);
       exit(return_code);
     }
-    template <class... Args>
-    static void out(std::format_string<Args...> fmt, Args &&...args) {
+    template <class... Args> static void out(std::format_string<Args...> fmt, Args &&...args) {
       std::println(stdout, fmt, std::forward<Args>(args)...);
     }
     template <class... Args>
-    static void inline_out(std::format_string<Args...> fmt, Args &&...args)  {
+    static void inline_out(std::format_string<Args...> fmt, Args &&...args) {
       std::print(stdout, fmt, std::forward<Args>(args)...);
     }
     template <class T, generic::is_formattable_error E, typename... Args>
