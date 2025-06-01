@@ -56,7 +56,7 @@ namespace moderna::cli {
     };
     struct parse_result {
       std::reference_wrapper<const app> app_ref;
-      std::optional<argparse_error> err;
+      std::optional<argument_error> err;
 
       const parse_result &exit_on_error(bool print_err = true, int err_code = 1) const {
         if (err) {

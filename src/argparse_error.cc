@@ -1,4 +1,5 @@
 module;
+#include <algorithm>
 #include <exception>
 #include <format>
 #include <string>
@@ -64,6 +65,23 @@ namespace moderna::cli {
     }
     const char *what() const noexcept {
       return __message.c_str();
+    }
+  };
+  export class argument_error : public std::exception {
+    std::string __msg;
+    std::string_view __key;
+    argparse_error_type __type;
+
+  public:
+    template <std::formattable<char> T>
+    argument_error(T &&key, argparse_error_type t) :
+      __msg{std::format("{}: {}", key, t)}, __type{t},
+      __key{__msg.begin(), std::ranges::find(__msg, ':')} {}
+    const char *what() const noexcept {
+      return __msg.c_str();
+    }
+    argparse_error_type type() const noexcept {
+      return __type;
     }
   };
 }

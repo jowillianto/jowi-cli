@@ -62,26 +62,27 @@ namespace moderna::cli {
       return __tiers.back().positional;
     }
 
-    std::expected<parsed_argument, argparse_error> parse(int argc, const char **argv) {
+    std::expected<parsed_argument, argument_error> parse(int argc, const char **argv) {
       auto empty_parse_result = parsed_argument::empty(argc, argv);
       return parse(empty_parse_result).transform([&](parsed_argument &r) { return r; });
     }
-    std::expected<std::reference_wrapper<parsed_argument>, argparse_error> parse(
+    std::expected<std::reference_wrapper<parsed_argument>, argument_error> parse(
       parsed_argument &prev_result
     ) {
       // Start parsing from the current tier.
       // Meaning:
       for (auto tier = __parse_beg(prev_result); tier != __tiers.cend(); tier += 1) {
         position_argument_type pos_arg = tier->positional;
+        auto pos_id = std::distance(__tiers.cbegin(), tier);
         if (__parse_tier(tier, prev_result)) {
           is_argument_parser auto parser = pos_arg.get_parser();
           bool use_parser = parser.use_parser(prev_result.raw_arg_cur());
           if (!use_parser) {
-            return std::unexpected{argparse_error{argparse_error_type::INVALID_VALUE}};
+            return std::unexpected{argument_error{pos_id, argparse_error_type::INVALID_VALUE}};
           }
           auto res = parser.parse(prev_result, prev_result.raw_mut_arg_cur());
           if (!res) {
-            return std::unexpected{res.error()};
+            return std::unexpected{argument_error{pos_id, res.error().type()}};
           }
         }
         // Iterate over parameters and parse until there is nothing parseable left.
@@ -94,7 +95,9 @@ namespace moderna::cli {
             if (use_parser) {
               auto res = parser.parse(prev_result, prev_result.raw_mut_arg_cur());
               if (!res) {
-                return std::unexpected{res.error()};
+                return std::unexpected{
+                  argument_error{parameter.get_key().value(), res.error().type()}
+                };
               }
             }
             if (prev_result.is_end()) {
@@ -110,7 +113,7 @@ namespace moderna::cli {
         for (const parameter_argument_type &parameter : tier->parameters) {
           auto res = parameter.get_parser().finalize(prev_result);
           if (!res) {
-            return std::unexpected{res.error()};
+            return std::unexpected{argument_error{parameter.get_key().value(), res.error().type()}};
           }
         }
 
@@ -120,7 +123,7 @@ namespace moderna::cli {
       }
       return std::ref(prev_result);
     }
-    std::expected<parsed_argument, argparse_error> parse(parsed_argument &&res) {
+    std::expected<parsed_argument, argument_error> parse(parsed_argument &&res) {
       return parse(res).transform([](parsed_argument &res) { return std::move(res); });
     }
 
