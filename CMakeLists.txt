@@ -7,26 +7,51 @@ set (CMAKE_CXX_SCAN_FOR_MODULES true)
 option (MODERNA_CLI_BUILD_TESTS "Build Tests" OFF)
 option (MODERNA_CLI_BUILD_PYTHON "Build Python Wrapper" OFF)
 
-if (NOT TARGET ${PROJECT_NAME}) 
-  file(GLOB ${PROJECT_NAME}_src
-    ${CMAKE_CURRENT_LIST_DIR}/src/*.cc
-    ${CMAKE_CURRENT_LIST_DIR}/src/*/*.cc
-  )
-  add_library(${PROJECT_NAME})
-  target_sources(${PROJECT_NAME}
-    PUBLIC
-      FILE_SET CXX_MODULES FILES ${${PROJECT_NAME}_src}
-  )
-  target_link_libraries(${PROJECT_NAME} PUBLIC moderna_generic)
-endif()
-
-if (NOT TARGET moderna_generic)
-  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/moderna-generic)
-endif()
+file(GLOB ${PROJECT_NAME}_src
+  ${CMAKE_CURRENT_LIST_DIR}/src/*.cc
+  ${CMAKE_CURRENT_LIST_DIR}/src/*/*.cc
+)
+add_library(${PROJECT_NAME})
+add_library(moderna::cli ALIAS ${PROJECT_NAME})
+target_sources(${PROJECT_NAME}
+  PUBLIC
+    FILE_SET CXX_MODULES FILES ${${PROJECT_NAME}_src}
+)
+target_link_libraries(${PROJECT_NAME} PUBLIC moderna_generic)
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
 
 if (MODERNA_CLI_BUILD_TESTS) 
   if (NOT TARGET moderna_test_lib)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/test-lib)
   endif()
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/tests)
+endif()
+
+if (MODERNA_INSTALL)
+  include(GNUInstallDirs)
+  set (MODERNA_COMPONENT_NAME "cli")
+  set_property(
+    TARGET ${PROJECT_NAME} 
+    PROPERTY EXPORT_NAME ${MODERNA_COMPONENT_NAME}
+  )
+  install (
+    TARGETS ${PROJECT_NAME}
+    EXPORT moderna
+    FILE_SET 
+      CXX_MODULES 
+      DESTINATION ${CMAKE_INSTALL_PREFIX}/cxx_modules/moderna/${MODERNA_COMPONENT_NAME}
+      COMPONENT ${MODERNA_COMPONENT_NAME}_file_set
+    CXX_MODULES_BMI 
+      COMPONENT ${MODERNA_COMPONENT_NAME}
+      DESTINATION ${CMAKE_INSTALL_PREFIX}/cxx_modules/moderna/${MODERNA_COMPONENT_NAME}
+  )
+  if (NOT MODERNA_GLOBAL_INSTALL)
+    install (
+      EXPORT moderna
+      DESTINATION ${CMAKE_INSTALL_LIBDIR}/moderna
+      FILE moderna-config.cmake
+      NAMESPACE moderna::
+      CXX_MODULES_DIRECTORY cxx_modules/moderna
+    )
+  endif()
 endif()
