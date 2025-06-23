@@ -42,6 +42,7 @@ namespace moderna::cli {
     std::expected<int, argparse_error> cast_int() const;
     std::expected<double, argparse_error> cast_double() const;
     std::string cast_string() const;
+    std::string_view cast_string_view() const;
   };
   export struct parameter_argument_value {
     argument_key key;
@@ -162,7 +163,7 @@ struct cli::argument_converter<number_type> {
     } else {
       std::string_view dig_bef_dot{v.begin(), dot};
       std::string_view dig_aft_dot{dot + 1, std::ranges::find_if(dot + 1, v.end(), [](char x) {
-                                     return !isnumber(x);
+                                     return !isdigit(x);
                                    })};
       return cli::argument_converter<int>::cast(dig_bef_dot).and_then([&](int bef_dot) {
         return cli::argument_converter<int>::cast(dig_aft_dot).transform([&](int aft_dot) {
@@ -206,4 +207,7 @@ std::expected<double, cli::argparse_error> cli::argument_value::cast_double() co
 }
 std::string cli::argument_value::cast_string() const {
   return cast<std::string>().value();
+}
+std::string_view cli::argument_value::cast_string_view() const {
+  return raw_value;
 }

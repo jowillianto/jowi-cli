@@ -17,7 +17,7 @@ target_sources(${PROJECT_NAME}
   PUBLIC
     FILE_SET CXX_MODULES FILES ${${PROJECT_NAME}_src}
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC moderna_generic)
+target_link_libraries(${PROJECT_NAME} PUBLIC moderna::generic)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
 
 if (MODERNA_CLI_BUILD_TESTS) 
