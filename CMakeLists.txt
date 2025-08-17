@@ -7,6 +7,10 @@ set (CMAKE_CXX_SCAN_FOR_MODULES true)
 option (MODERNA_CLI_BUILD_TESTS "Build Tests" OFF)
 option (MODERNA_CLI_BUILD_PYTHON "Build Python Wrapper" OFF)
 
+if (NOT TARGET moderna::generic)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/moderna-generic)
+endif()
+
 file(GLOB ${PROJECT_NAME}_src
   ${CMAKE_CURRENT_LIST_DIR}/src/*.cc
   ${CMAKE_CURRENT_LIST_DIR}/src/*/*.cc
