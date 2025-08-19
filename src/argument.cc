@@ -1,11 +1,11 @@
 module;
 #include <algorithm>
 #include <expected>
+#include <format>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
-#include <format>
 export module moderna.cli:argument;
 import moderna.generic;
 import :argument_value;
@@ -72,8 +72,8 @@ namespace moderna::cli {
       help_text = std::string{v};
       return *this;
     }
-    template <class ...Args>
-    parameter_argument &help(std::format_string<Args...> fmt, Args&& ...args) {
+    template <class... Args>
+    parameter_argument &help(std::format_string<Args...> fmt, Args &&...args) {
       help_text = std::format(fmt, std::forward<Args>(args)...);
       return *this;
     }
@@ -148,8 +148,8 @@ namespace moderna::cli {
       help_text = std::string{v};
       return *this;
     }
-    template <class ...Args>
-    basic_position_argument &help(std::format_string<Args...> fmt, Args&& ...args) {
+    template <class... Args>
+    basic_position_argument &help(std::format_string<Args...> fmt, Args &&...args) {
       help_text = std::format(fmt, std::forward<Args>(args)...);
       return *this;
     }

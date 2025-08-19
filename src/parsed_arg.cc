@@ -2,27 +2,29 @@ module;
 #include <optional>
 #include <string_view>
 #include <vector>
-export module moderna.cli:parsed_argument;
-import :argument_value;
+export module moderna.cli:parsed_arg;
+import moderna.generic;
 import :raw_argument;
-import :argument_key;
+import :arg_key;
 
 namespace moderna::cli {
-  export class parsed_argument {
-    std::vector<position_argument_value> __values;
+  struct positional_parsed_arg {
+    std::string_view value;
+    generic::key_vector<arg_key, std::string_view> params;
+  };
+  export class parsed_arg {
+    std::vector<positional_parsed_arg> __values;
     raw_argument_iterator __beg;
     raw_argument_iterator __end;
 
-    parsed_argument(raw_argument_iterator beg, raw_argument_iterator end) :
+    parsed_arg(raw_argument_iterator beg, raw_argument_iterator end) :
       __values{}, __beg{beg}, __end{end} {}
 
   public:
     /*
       Add a parameter argument
     */
-    constexpr parameter_argument_value &add_argument(argument_key key, std::string_view value) {
-      return __values.back().add_argument(std::move(key), argument_value{value});
-    }
+    constexpr parsed_arg &add_argument(arg_key key, std::string_view value) {}
     constexpr position_argument_value &add_argument(std::string_view argument) {
       return __values.emplace_back(position_argument_value{argument_value{argument}});
     }
@@ -69,26 +71,26 @@ namespace moderna::cli {
       Getting an argument
     */
     constexpr std::optional<argument_value> first_of(
-      const is_comparable_with<argument_key> auto &key
+      const std::equality_comparable_with<arg_key> auto &key
     ) const noexcept {
       return __values.back().first_of(key);
     }
     /*
       Checking existence
     */
-    constexpr bool contains(const is_comparable_with<argument_key> auto &key) const noexcept {
+    constexpr bool contains(const std::equality_comparable_with<arg_key> auto &key) const noexcept {
       return __values.back().contains(key);
     }
     /*
       Counting amount of modules
     */
-    constexpr size_t count(const is_comparable_with<argument_key> auto &key) const noexcept {
+    constexpr size_t count(const std::equality_comparable_with<arg_key> auto &key) const noexcept {
       return __values.back().count(key);
     }
     /*
       Filter
     */
-    constexpr auto filter(const is_comparable_with<argument_key> auto &key) const noexcept {
+    constexpr auto filter(const std::equality_comparable_with<arg_key> auto &key) const noexcept {
       return __values.back().filter(key);
     }
     position_argument_value &raw_mut_args() noexcept {
@@ -104,8 +106,8 @@ namespace moderna::cli {
     /*
       Creates a new parsed_argument that is empty.
     */
-    static parsed_argument empty(int argc, const char **argv) noexcept {
-      return parsed_argument{
+    static parsed_arg empty(int argc, const char **argv) noexcept {
+      return parsed_arg{
         raw_argument_iterator::begin(argc, argv), raw_argument_iterator::end(argc, argv)
       };
     }

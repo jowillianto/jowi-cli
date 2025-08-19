@@ -54,6 +54,30 @@ template <class char_type> struct std::formatter<cli::argparse_error_type, char_
   wraps error and gives it an error type. F
 */
 namespace moderna::cli {
+  export struct parse_error : public std::exception {
+    argparse_error_type __t;
+    std::string __msg;
+
+  public:
+    template <class... Args>
+      requires(std::formattable<Args, char> && ...)
+    parse_error(argparse_error_type t, std::format_string<Args...> fmt, Args &&...args) :
+      __t{t}, __msg{} {
+      auto it = std::back_inserter(__msg);
+      std::format_to(it, "{}: ", t);
+      std::format_to(it, fmt, std::forward<Args>(args)...);
+    }
+    parse_error(argparse_error_type t, std::string_view msg) : parse_error(t, "{}", msg) {}
+
+    const char *what() const noexcept {
+      return __msg.c_str();
+    }
+
+    argparse_error_type err_type() const noexcept {
+      return __t;
+    }
+  };
+
   export class argparse_error : public std::exception {
     argparse_error_type __type;
     std::string __message;
