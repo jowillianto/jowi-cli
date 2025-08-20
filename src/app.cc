@@ -1,262 +1,371 @@
 module;
-#include <algorithm>
+#include <cstdlib>
 #include <expected>
 #include <format>
-#include <functional>
-#include <optional>
 #include <print>
 #include <source_location>
 #include <string>
 #include <string_view>
 export module moderna.cli:app;
 import moderna.generic;
-import :argument_parser;
-import :argument_value;
-import :argparse_error;
-import :app_version;
+import :parse_error;
+import :arg_key;
+import :arg_parser;
+import :parsed_arg;
+import :raw_args;
 import :app_identity;
-import :argument;
-import :argument_key;
+import :terminal;
 
 namespace moderna::cli {
-  struct app_parser_arg {
-    bool auto_help = true;
-    bool auto_exit = true;
-    bool is_final = true;
-  };
-
-  export class app {
-  public:
-    struct action {
-      std::function<void(app &)> action;
-      std::string help_text;
-    };
-    struct action_builder {
-      std::reference_wrapper<app> app_ref;
-
-      template <std::invocable<app &> F>
-      action_builder &add_action(std::string action_name, std::string help, F &&f) {
-        app_ref.get().argument_parser().positional().add_option(
-          std::move(action_name), action{std::forward<F>(f), std::move(help)}
-        );
-        return *this;
-      }
-      void run() {
-        auto res = app_ref.get().parse_argument({.is_final = false});
-        auto selected_option = app_ref.get().arguments().current_positional();
-        auto option = app_ref.get().argument_parser().positional().get_option(selected_option);
-        if (!option) {
-          res.exit_on_help();
-          app_ref.get().error(1, "Error: No such action \"{}\"", selected_option);
-        } else {
-          app_ref.get().add_help_argument();
-          option->get().action(app_ref.get());
-        }
-      }
-    };
-    struct parse_result {
-      std::reference_wrapper<const app> app_ref;
-      std::optional<argument_error> err;
-
-      const parse_result &exit_on_error(bool print_err = true, int err_code = 1) const {
-        if (err) {
-          app_ref.get().error(err_code, "Error of type {}: {}", err->type(), err->what());
-        }
-        return *this;
-      }
-      const parse_result &exit_on_help(int ret_code = 0) const {
-        auto args = app_ref.get().arguments();
-        if (args.contains("--help") || args.contains("-h")) {
-          app_ref.get().print_help(true);
-          exit(ret_code);
-        }
-        return *this;
-      }
-      void assert_final() {
-        if (!app_ref.get().arguments().is_end()) {
-          std::string args;
-          auto args_inserter = std::back_inserter(args);
-          for (auto arg = app_ref.get().arguments().raw_arg_cur();
-               arg != app_ref.get().arguments().raw_arg_end();
-               arg++) {
-            std::format_to(args_inserter, "{} ", *arg);
-          }
-          app_ref.get().error(1, "Error: Unknown Arguments : {}", args);
-        }
-      }
-    };
-    using position_argument_type = optioned_position_argument<action>;
-    using parameter_argument_type = parameter_argument;
-
+  export struct app {
   private:
-    app_identity __id;
-    argument_parser<optioned_position_argument<action>, parameter_argument> __parser;
-    parsed_argument __parsed_args;
+    parsed_arg __args;
+    arg_parser __parser;
 
   public:
-    app(app_identity id, int argc, const char **argv, bool auto_help = true) :
-      __id{std::move(id)}, __parser{}, __parsed_args{parsed_argument::empty(argc, argv)} {
-      add_argument(true);
+    app_identity id;
+    text_format err_fmt;
+    text_format help_fmt;
+    app(app_identity id, int argc, const char **argv) :
+      __args{raw_args{argc, argv}}, __parser{}, id{std::move(id)},
+      err_fmt{text_format{}.fg(color::red())}, help_fmt{text_format{}.fg(color::green())} {}
+
+    arg &add_argument() {
+      return __parser.add_argument();
+    }
+    arg &add_argument(arg_key k) {
+      return __parser.add_argument(std::move(k));
+    }
+    arg &add_argument(std::string_view k) {
+      return __parser.add_argument(std::move(k));
+    }
+
+    const parsed_arg &args() const noexcept {
+      return __args;
     }
 
     /*
-      Argument Adding parsing
+      Formatting with Error and Help
     */
-    position_argument_type &add_argument(std::same_as<bool> auto auto_help = true) {
-      auto &arg = __parser.add_argument();
-      if (auto_help) add_help_argument();
-      return arg;
-    }
-    parameter_argument_type &add_argument(std::string_view arg_key) {
-      return __parser.add_argument(argument_key::make_arg(arg_key).value());
-    }
-    app &add_help_argument(std::string_view help_text = "Show help information") {
-      add_argument("-h").optional().as_flag().help(help_text);
-      add_argument("--help").optional().as_flag().help(help_text);
-      return *this;
-    }
-    const parsed_argument &arguments() const noexcept {
-      return __parsed_args;
-    }
-    argument_parser<optioned_position_argument<action>, parameter_argument> &
-    argument_parser() noexcept {
-      return __parser;
-    }
-
-    /*
-      Application Identity
-    */
-    std::string_view name() const noexcept {
-      return __id.name;
-    }
-    std::string_view description() const noexcept {
-      return __id.description;
-    }
-    const app_version &version() const noexcept {
-      return __id.version;
-    }
-    const app_identity &id() const noexcept {
-      return __id;
-    }
-
-    /*
-      Parsing and running
-    */
-    parse_result parse_argument(app_parser_arg arg = app_parser_arg{true, true, true}) {
-      auto res =
-        __parser.parse(__parsed_args)
-          .transform_error([&](auto &&e) { return parse_result{std::cref(*this), std::move(e)}; })
-          .error_or(parse_result{std::cref(*this), std::nullopt});
-      if (arg.auto_help) res.exit_on_help();
-      if (arg.auto_exit) res.exit_on_error();
-      if (arg.is_final) res.assert_final();
-      return res;
-    }
-
-    /*
-      Action Builder
-    */
-    action_builder build_action(std::string help_text = "") noexcept {
-      add_argument(false).help(std::move(help_text));
-      return action_builder{std::ref(*this)};
-    }
-
-    /*
-      Printing Help Information
-    */
-    void print_help(bool include_id) const {
-      if (include_id) {
-        out("{}\n", id());
+    terminal_nodes help() const {
+      auto nodes = terminal_nodes{}.begin_format(help_fmt);
+      auto beg_id = args().size();
+      for (auto arg = __parser.begin() + args().size() - 1; arg != __parser.end(); arg += 1) {
+        if (beg_id == args().size()) {
+          nodes.append_node("arg{}", beg_id).new_line();
+        }
+        if (!arg->empty()) {
+          nodes.append_node("Keyword Arguments: ").new_line();
+        }
+        for (const auto &[k, arg] : (*arg)) {
+          nodes.append_node("{}: ", k);
+          auto sub_nodes = terminal_nodes{2};
+          arg.help(sub_nodes);
+          nodes.append_sub_node(std::move(sub_nodes));
+        }
+        beg_id += 1;
       }
-      for (auto arg = __parsed_args.arg_begin(); arg != __parsed_args.arg_end(); arg++) {
-        if (arg + 1 == __parsed_args.arg_end()) {
-          out("{}", arg->value());
-        } else {
-          inline_out("{} ", arg->value());
-        }
+      return nodes;
+    }
+
+    void add_help_argument() {
+      __parser.add_argument("-h").help("Show the help message for the application").optional();
+      __parser.add_argument("--help").help("Show the help message for the application").optional();
+    }
+
+    void parse_args(bool auto_help = true) {
+      auto res = __parser.parse(__args);
+      auto help_arg_count = __args.count("-h") + __args.count("--help");
+      if (help_arg_count != 0 && auto_help) {
+        std::println("{}", help());
+        std::exit(0);
       }
-      for (auto tier = __parser.begin() + __parsed_args.tier() - 1; tier != __parser.end();
-           tier++) {
-        auto tier_id = std::distance(__parser.begin(), tier);
-        if (tier != __parser.begin() && tier > __parser.begin() + __parsed_args.tier() - 1) {
-          out("arg{} - {}", tier_id, tier->positional.get_help().value_or("<no-help>"));
-          if (tier->positional.option_size() != 0) {
-            out("Options: ");
-            for (auto option = tier->positional.options.begin();
-                 option != tier->positional.options.end();
-                 option++) {
-              out("{:16} : {}", option->name, option->data.help_text);
-            }
-          }
-        }
-        if (tier->parameters.size() != 0) {
-          out("Parameters : ");
-        }
-        for (const auto &param : tier->parameters) {
-          out("{:16} : {}", param.get_key().value(), param.get_help().value_or("<no-help>"));
-        }
+      if (!res) {
+        std::println("{}", terminal_nodes::with_format(err_fmt, res.error().what(), 0));
+        std::exit(1);
       }
     }
-
-    /*
-      CLI Shortcut Functions
-    */
-    template <class... Args> static void warn(std::format_string<Args...> fmt, Args &&...args) {
-      std::println(stderr, fmt, std::forward<Args>(args)...);
-    }
-    template <class... Args>
-    static void error(int return_code, std::format_string<Args...> fmt, Args &&...args) {
-      std::println(stderr, fmt, std::forward<Args>(args)...);
-      exit(return_code);
-    }
-    template <class... Args> static void out(std::format_string<Args...> fmt, Args &&...args) {
-      std::println(stdout, fmt, std::forward<Args>(args)...);
-    }
-    template <class... Args>
-    static void inline_out(std::format_string<Args...> fmt, Args &&...args) {
-      std::print(stdout, fmt, std::forward<Args>(args)...);
-    }
-    template <class T, generic::is_formattable_error E, typename... Args>
-    static T test_expected(
-      std::expected<T, E> &&res,
-      int return_code,
-      std::format_string<generic::error_formatter, Args...> fmt,
-      Args &&...args
+    template <class T, class E, std::invocable<generic::error_formatter, std::string_view, int> F>
+      requires(std::constructible_from<generic::error_formatter, E>)
+    T expect_or(
+      std::expected<T, E> &&res, F &&f, std::source_location loc = std::source_location::current()
     ) {
-      if (res.has_value()) {
-        if constexpr (std::same_as<T, void>) {
-          return;
-        } else {
-          return std::move(res.value());
-        }
+      if (!res) {
+        std::invoke(
+          f,
+          generic::error_formatter{std::move(res.error())},
+          std::string_view{loc.file_name()},
+          loc.line()
+        );
+        std::exit(1);
       } else {
-        error(return_code, fmt, generic::error_formatter{res.error()}, std::forward<Args>(args)...);
-        throw;
+        return std::move(res.value());
       }
     }
-    template <class T, generic::is_formattable_error E>
-    static T test_expected(
+    template <class T, class E, class... Args>
+      requires(std::constructible_from<generic::error_formatter, E>)
+    T expect(
       std::expected<T, E> &&res,
-      int return_code = 1,
+      std::format_string<generic::error_formatter, std::string_view, int, Args...> fmt,
+      Args &&...args,
       std::source_location loc = std::source_location::current()
     ) {
-      auto full_function_name = std::string_view{loc.function_name()};
-      auto function_name = std::string_view{
-        std::ranges::find(full_function_name, ' ') + 1, std::ranges::find(full_function_name, '(')
-      };
-      return test_expected(
+      return expect_or(
         std::move(res),
-        return_code,
-        "{2:}: {0:} ({1:}:{3:})",
-        loc.file_name(),
-        function_name,
-        loc.line()
+        [&](auto e, auto fname, auto line) {
+          std::println(
+            stderr,
+            "{}",
+            terminal_nodes{}
+              .begin_format(err_fmt)
+              .append_node(fmt, e, fname, line, std::forward<Args>(args)...)
+              .end_format()
+          );
+        },
+        loc
       );
     }
   };
-  export using app_action = app::action;
-  export using app_parse_result = app::parse_result;
-  export using app_action_builder = app::action_builder;
-  export using app_position_argument = app::position_argument_type;
-  export using app_parameter_argument = app::parameter_argument_type;
+  // struct app_parser_arg {
+  //   bool auto_help = true;
+  //   bool auto_exit = true;
+  //   bool is_final = true;
+  // };
+
+  // export class app {
+  // public:
+  //   struct action {
+  //     std::function<void(app &)> action;
+  //     std::string help_text;
+  //   };
+  //   struct action_builder {
+  //     std::reference_wrapper<app> app_ref;
+
+  //     template <std::invocable<app &> F>
+  //     action_builder &add_action(std::string action_name, std::string help, F &&f) {
+  //       app_ref.get().argument_parser().positional().add_option(
+  //         std::move(action_name), action{std::forward<F>(f), std::move(help)}
+  //       );
+  //       return *this;
+  //     }
+  //     void run() {
+  //       auto res = app_ref.get().parse_argument({.is_final = false});
+  //       auto selected_option = app_ref.get().arguments().current_positional();
+  //       auto option = app_ref.get().argument_parser().positional().get_option(selected_option);
+  //       if (!option) {
+  //         res.exit_on_help();
+  //         app_ref.get().error(1, "Error: No such action \"{}\"", selected_option);
+  //       } else {
+  //         app_ref.get().add_help_argument();
+  //         option->get().action(app_ref.get());
+  //       }
+  //     }
+  //   };
+  //   struct parse_result {
+  //     std::reference_wrapper<const app> app_ref;
+  //     std::optional<argument_error> err;
+
+  //     const parse_result &exit_on_error(bool print_err = true, int err_code = 1) const {
+  //       if (err) {
+  //         app_ref.get().error(err_code, "Error of type {}: {}", err->type(), err->what());
+  //       }
+  //       return *this;
+  //     }
+  //     const parse_result &exit_on_help(int ret_code = 0) const {
+  //       auto args = app_ref.get().arguments();
+  //       if (args.contains("--help") || args.contains("-h")) {
+  //         app_ref.get().print_help(true);
+  //         exit(ret_code);
+  //       }
+  //       return *this;
+  //     }
+  //     void assert_final() {
+  //       if (!app_ref.get().arguments().is_end()) {
+  //         std::string args;
+  //         auto args_inserter = std::back_inserter(args);
+  //         for (auto arg = app_ref.get().arguments().raw_arg_cur();
+  //              arg != app_ref.get().arguments().raw_arg_end();
+  //              arg++) {
+  //           std::format_to(args_inserter, "{} ", *arg);
+  //         }
+  //         app_ref.get().error(1, "Error: Unknown Arguments : {}", args);
+  //       }
+  //     }
+  //   };
+  //   using position_argument_type = optioned_position_argument<action>;
+  //   using parameter_argument_type = parameter_argument;
+
+  // private:
+  //   app_identity __id;
+  //   argument_parser<optioned_position_argument<action>, parameter_argument> __parser;
+  //   parsed_argument __parsed_args;
+
+  // public:
+  //   app(app_identity id, int argc, const char **argv, bool auto_help = true) :
+  //     __id{std::move(id)}, __parser{}, __parsed_args{parsed_argument::empty(argc, argv)} {
+  //     add_argument(true);
+  //   }
+
+  //   /*
+  //     Argument Adding parsing
+  //   */
+  //   position_argument_type &add_argument(std::same_as<bool> auto auto_help = true) {
+  //     auto &arg = __parser.add_argument();
+  //     if (auto_help) add_help_argument();
+  //     return arg;
+  //   }
+  //   parameter_argument_type &add_argument(std::string_view arg_key) {
+  //     return __parser.add_argument(argument_key::make_arg(arg_key).value());
+  //   }
+  //   app &add_help_argument(std::string_view help_text = "Show help information") {
+  //     add_argument("-h").optional().as_flag().help(help_text);
+  //     add_argument("--help").optional().as_flag().help(help_text);
+  //     return *this;
+  //   }
+  //   const parsed_argument &arguments() const noexcept {
+  //     return __parsed_args;
+  //   }
+  //   argument_parser<optioned_position_argument<action>, parameter_argument> &
+  //   argument_parser() noexcept {
+  //     return __parser;
+  //   }
+
+  //   /*
+  //     Application Identity
+  //   */
+  //   std::string_view name() const noexcept {
+  //     return __id.name;
+  //   }
+  //   std::string_view description() const noexcept {
+  //     return __id.description;
+  //   }
+  //   const app_version &version() const noexcept {
+  //     return __id.version;
+  //   }
+  //   const app_identity &id() const noexcept {
+  //     return __id;
+  //   }
+
+  //   /*
+  //     Parsing and running
+  //   */
+  //   parse_result parse_argument(app_parser_arg arg = app_parser_arg{true, true, true}) {
+  //     auto res =
+  //       __parser.parse(__parsed_args)
+  //         .transform_error([&](auto &&e) { return parse_result{std::cref(*this), std::move(e)};
+  //         }) .error_or(parse_result{std::cref(*this), std::nullopt});
+  //     if (arg.auto_help) res.exit_on_help();
+  //     if (arg.auto_exit) res.exit_on_error();
+  //     if (arg.is_final) res.assert_final();
+  //     return res;
+  //   }
+
+  //   /*
+  //     Action Builder
+  //   */
+  //   action_builder build_action(std::string help_text = "") noexcept {
+  //     add_argument(false).help(std::move(help_text));
+  //     return action_builder{std::ref(*this)};
+  //   }
+
+  //   /*
+  //     Printing Help Information
+  //   */
+  //   void print_help(bool include_id) const {
+  //     if (include_id) {
+  //       out("{}\n", id());
+  //     }
+  //     for (auto arg = __parsed_args.arg_begin(); arg != __parsed_args.arg_end(); arg++) {
+  //       if (arg + 1 == __parsed_args.arg_end()) {
+  //         out("{}", arg->value());
+  //       } else {
+  //         inline_out("{} ", arg->value());
+  //       }
+  //     }
+  //     for (auto tier = __parser.begin() + __parsed_args.tier() - 1; tier != __parser.end();
+  //          tier++) {
+  //       auto tier_id = std::distance(__parser.begin(), tier);
+  //       if (tier != __parser.begin() && tier > __parser.begin() + __parsed_args.tier() - 1) {
+  //         out("arg{} - {}", tier_id, tier->positional.get_help().value_or("<no-help>"));
+  //         if (tier->positional.option_size() != 0) {
+  //           out("Options: ");
+  //           for (auto option = tier->positional.options.begin();
+  //                option != tier->positional.options.end();
+  //                option++) {
+  //             out("{:16} : {}", option->name, option->data.help_text);
+  //           }
+  //         }
+  //       }
+  //       if (tier->parameters.size() != 0) {
+  //         out("Parameters : ");
+  //       }
+  //       for (const auto &param : tier->parameters) {
+  //         out("{:16} : {}", param.get_key().value(), param.get_help().value_or("<no-help>"));
+  //       }
+  //     }
+  //   }
+
+  //   /*
+  //     CLI Shortcut Functions
+  //   */
+  //   template <class... Args> static void warn(std::format_string<Args...> fmt, Args &&...args)
+  //   {
+  //     std::println(stderr, fmt, std::forward<Args>(args)...);
+  //   }
+  //   template <class... Args>
+  //   static void error(int return_code, std::format_string<Args...> fmt, Args &&...args) {
+  //     std::println(stderr, fmt, std::forward<Args>(args)...);
+  //     exit(return_code);
+  //   }
+  //   template <class... Args> static void out(std::format_string<Args...> fmt, Args &&...args) {
+  //     std::println(stdout, fmt, std::forward<Args>(args)...);
+  //   }
+  //   template <class... Args>
+  //   static void inline_out(std::format_string<Args...> fmt, Args &&...args) {
+  //     std::print(stdout, fmt, std::forward<Args>(args)...);
+  //   }
+  //   template <class T, generic::is_formattable_error E, typename... Args>
+  //   static T test_expected(
+  //     std::expected<T, E> &&res,
+  //     int return_code,
+  //     std::format_string<generic::error_formatter, Args...> fmt,
+  //     Args &&...args
+  //   ) {
+  //     if (res.has_value()) {
+  //       if constexpr (std::same_as<T, void>) {
+  //         return;
+  //       } else {
+  //         return std::move(res.value());
+  //       }
+  //     } else {
+  //       error(return_code, fmt, generic::error_formatter{res.error()},
+  //       std::forward<Args>(args)...); throw;
+  //     }
+  //   }
+  //   template <class T, generic::is_formattable_error E>
+  //   static T test_expected(
+  //     std::expected<T, E> &&res,
+  //     int return_code = 1,
+  //     std::source_location loc = std::source_location::current()
+  //   ) {
+  //     auto full_function_name = std::string_view{loc.function_name()};
+  //     auto function_name = std::string_view{
+  //       std::ranges::find(full_function_name, ' ') + 1, std::ranges::find(full_function_name,
+  //       '(')
+  //     };
+  //     return test_expected(
+  //       std::move(res),
+  //       return_code,
+  //       "{2:}: {0:} ({1:}:{3:})",
+  //       loc.file_name(),
+  //       function_name,
+  //       loc.line()
+  //     );
+  //   }
+  // };
+  // export using app_action = app::action;
+  // export using app_parse_result = app::parse_result;
+  // export using app_action_builder = app::action_builder;
+  // export using app_position_argument = app::position_argument_type;
+  // export using app_parameter_argument = app::parameter_argument_type;
 }

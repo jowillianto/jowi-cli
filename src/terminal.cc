@@ -71,6 +71,58 @@ namespace moderna::cli {
       requires std::constructible_from<color_variant, Args...>
       : _value(std::forward<Args>(args)...) {}
 
+    // Factory functions for basic colors
+    static constexpr color black() {
+      return color{basic_color::black};
+    }
+    static constexpr color red() {
+      return color{basic_color::red};
+    }
+    static constexpr color green() {
+      return color{basic_color::green};
+    }
+    static constexpr color yellow() {
+      return color{basic_color::yellow};
+    }
+    static constexpr color blue() {
+      return color{basic_color::blue};
+    }
+    static constexpr color magenta() {
+      return color{basic_color::magenta};
+    }
+    static constexpr color cyan() {
+      return color{basic_color::cyan};
+    }
+    static constexpr color white() {
+      return color{basic_color::white};
+    }
+
+    // Factory functions for bright variants
+    static constexpr color bright_black() {
+      return color{basic_color::bright_black};
+    }
+    static constexpr color bright_red() {
+      return color{basic_color::bright_red};
+    }
+    static constexpr color bright_green() {
+      return color{basic_color::bright_green};
+    }
+    static constexpr color bright_yellow() {
+      return color{basic_color::bright_yellow};
+    }
+    static constexpr color bright_blue() {
+      return color{basic_color::bright_blue};
+    }
+    static constexpr color bright_magenta() {
+      return color{basic_color::bright_magenta};
+    }
+    static constexpr color bright_cyan() {
+      return color{basic_color::bright_cyan};
+    }
+    static constexpr color bright_white() {
+      return color{basic_color::bright_white};
+    }
+
     // Comparison operators
     constexpr bool operator==(const color &) const = default;
     constexpr auto operator<=>(const color &) const = default;
@@ -331,11 +383,11 @@ namespace moderna::cli {
 }
 
 template <> struct std::formatter<moderna::cli::text_effect, char> {
-  constexpr auto parse(std::format_parse_context &ctx) {
+  constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
 
-  auto format(const moderna::cli::text_effect &effect, std::format_context &ctx) const {
+  auto format(const moderna::cli::text_effect &effect, auto &ctx) const {
     using moderna::cli::text_effect;
     switch (effect) {
       case text_effect::bold:
@@ -362,11 +414,11 @@ template <> struct std::formatter<moderna::cli::text_effect, char> {
 };
 
 template <> struct std::formatter<moderna::cli::color, char> {
-  constexpr auto parse(std::format_parse_context &ctx) {
+  constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
 
-  auto format(const moderna::cli::color &c, std::format_context &ctx) const {
+  auto format(const moderna::cli::color &c, auto &ctx) const {
     using moderna::cli::basic_color;
     using moderna::cli::indexed_color;
     using moderna::cli::rgb_color;
@@ -422,11 +474,11 @@ template <> struct std::formatter<moderna::cli::color, char> {
 };
 
 template <> struct std::formatter<moderna::cli::text_format, char> {
-  constexpr auto parse(std::format_parse_context &ctx) {
+  constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
 
-  auto format(const moderna::cli::text_format &fmt, std::format_context &ctx) const {
+  auto format(const moderna::cli::text_format &fmt, auto &ctx) const {
     auto out = ctx.out();
     if (fmt._bg.has_value()) {
       out = std::format_to(out, "{}", fmt._bg.value());
@@ -442,11 +494,11 @@ template <> struct std::formatter<moderna::cli::text_format, char> {
 };
 
 template <> struct std::formatter<moderna::cli::terminal_node, char> {
-  constexpr auto parse(std::format_parse_context &ctx) {
+  constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
 
-  auto format(const moderna::cli::terminal_node &node, std::format_context &ctx) const {
+  auto format(const moderna::cli::terminal_node &node, auto &ctx) const {
     if (node.is_begin()) {
       return std::format_to(ctx.out(), "{}", node.get_begin().format);
     } else if (node.is_end()) {
@@ -463,11 +515,11 @@ template <> struct std::formatter<moderna::cli::terminal_node, char> {
 };
 
 template <> struct std::formatter<moderna::cli::terminal_nodes, char> {
-  constexpr auto parse(std::format_parse_context &ctx) {
+  constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
 
-  auto format(const moderna::cli::terminal_nodes &nodes, std::format_context &ctx) const {
+  auto format(const moderna::cli::terminal_nodes &nodes, auto &ctx) const {
     auto out = ctx.out();
     for (const auto &node : nodes._nodes) {
       out = std::format_to(out, "{}", node);

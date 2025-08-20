@@ -1,13 +1,16 @@
 module;
 #include <algorithm>
+#include <charconv>
+#include <concepts>
 #include <expected>
+#include <format>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 export module moderna.cli:arg;
 import :terminal;
-import :argparse_error;
+import :parse_error;
 import :parsed_arg;
 import :arg_key;
 
@@ -44,6 +47,10 @@ namespace moderna::cli {
     }
     arg_option &help(std::string msg) {
       __help_text.emplace(msg);
+      return *this;
+    }
+    template <class... Args> arg_option &help(std::format_string<Args...> fmt, Args &&...args) {
+      __help_text.emplace(std::format(fmt, std::forward<Args>(args)...));
       return *this;
     }
   };
@@ -124,12 +131,10 @@ namespace moderna::cli {
       std::optional<std::string_view> value
     ) const override {
       if (!value) {
-        return std::unexpected{parse_error{argparse_error_type::NO_VALUE_GIVEN, ""}};
+        return std::unexpected{parse_error{parse_error_type::NO_VALUE_GIVEN, ""}};
       }
       if (!__get(value.value())) {
-        return std::unexpected{
-          parse_error{argparse_error_type::INVALID_VALUE, "{}", value.value()}
-        };
+        return std::unexpected{parse_error{parse_error_type::INVALID_VALUE, "{}", value.value()}};
       }
       return {};
     }
@@ -185,13 +190,14 @@ namespace moderna::cli {
       size_t arg_count = key.transform([&](const arg_key &k) { return args.count(k); }).value_or(1);
       if (arg_count > max_size || arg_count < min_size) {
         return std::unexpected{parse_error{
-          argparse_error_type::TOO_MANY_VALUE_GIVEN,
+          parse_error_type::TOO_MANY_VALUE_GIVEN,
           "{} not in {} <= x <= {}",
           arg_count,
           min_size,
           max_size
         }};
       }
+      return {};
     }
   };
 
@@ -208,7 +214,7 @@ namespace moderna::cli {
       std::optional<std::string_view> value
     ) const override {
       if (!value) {
-        return std::unexpected{parse_error{argparse_error_type::NO_VALUE_GIVEN, ""}};
+        return std::unexpected{parse_error{parse_error_type::NO_VALUE_GIVEN, ""}};
       }
       return {};
     }
@@ -230,6 +236,10 @@ namespace moderna::cli {
     // Builder Pattern
     arg &help(std::string help_text) {
       __help_text.emplace(help_text);
+      return *this;
+    }
+    template <class... Args> arg &help(std::format_string<Args...> fmt, Args &&...args) {
+      __help_text.emplace(std::format(fmt, std::forward<Args>(args)...));
       return *this;
     }
     template <std::derived_from<basic_arg_validator> T>
@@ -266,11 +276,11 @@ namespace moderna::cli {
     arg &n_range(size_t min_size, size_t max_size) {
       return add_validator(arg_count_validator::range(min_size, max_size));
     }
-    arg &not_empty() {
+    arg &require_value() {
       return add_validator(arg_empty_validator{});
     }
     arg &required() {
-      return not_empty().n_equal_to(1);
+      return require_value().n_equal_to(1);
     }
     arg &optional() {
       return n_range(0, 1);
@@ -326,4 +336,27 @@ namespace moderna::cli {
       return {};
     }
   };
+
+  /*
+    Shortcut Parse Functions (to number)
+  */
+  export template <class num_type>
+    requires(std::floating_point<num_type> || std::integral<num_type>)
+  std::expected<num_type, parse_error> parse_num(std::string_view v) {
+    num_type num;
+    auto res = std::from_chars(v.begin(), v.end(), num);
+    if (res.ec == std::errc{}) {
+      return num;
+    } else {
+      return std::unexpected{parse_error{parse_error_type::INVALID_VALUE, "{} not a number", v}};
+    }
+  }
+
+  /*
+    Instantiate
+  */
+  template std::expected<int, parse_error> parse_num(std::string_view);
+  template std::expected<long long int, parse_error> parse_num(std::string_view);
+  template std::expected<float, parse_error> parse_num(std::string_view);
+  template std::expected<double, parse_error> parse_num(std::string_view);
 }
