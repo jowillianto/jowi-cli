@@ -12,20 +12,6 @@ namespace moderna::cli {
     std::optional<std::string> author = std::nullopt;
     std::optional<std::string> license = std::nullopt;
     app_version version;
-
-    app_identity(std::string name, std::string description, app_version version) :
-      name{std::move(name)}, description{std::move(description)}, version{std::move(version)},
-      author{std::nullopt}, license{std::nullopt} {}
-
-    app_identity &written_by(std::string author) {
-      this->author.emplace(std::move(author));
-      return *this;
-    }
-
-    app_identity &with_license(std::string license) {
-      this->license.emplace(std::move(license));
-      return *this;
-    }
   };
 }
 
