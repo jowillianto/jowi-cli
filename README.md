@@ -15,8 +15,7 @@ cli::app_identity app_id{
 
 int main(int argc, const char** argv) {
   auto app = cli::app{app_id, argc, argv};
-  app.add_argument("--hello-world").help("Says Hello World").required().as_flag();
-  app.parse_argument();
-  app.out("Hello World");
+  app.add_argument("--hello-world").help("Says Hello World").required();
+  app.parse_args();
 }
 ```
