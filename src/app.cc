@@ -137,5 +137,8 @@ namespace moderna::cli {
       );
       std::exit(ret_code);
     }
+    template <class... Args> void out(std::format_string<Args...> fmt, Args &&...args) {
+      std::println(fmt, std::forward<Args>(args)...);
+    }
   };
 }
