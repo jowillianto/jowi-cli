@@ -104,10 +104,10 @@ namespace moderna::cli {
       add_argument();
     }
     arg &add_argument(const arg_key &k) {
-      return __args.back().params.insert(k, arg::flag());
+      return __args.back().params.emplace(k, arg::flag());
     }
     arg &add_argument(std::string_view k) {
-      return __args.back().params.insert(arg_key::make(k).value(), arg::flag());
+      return __args.back().params.emplace(arg_key::make(k).value(), arg::flag());
     }
     arg &add_argument() {
       __args.emplace_back(arg::positional());
