@@ -125,5 +125,17 @@ namespace moderna::cli {
         loc
       );
     }
+    template <class... Args>
+    void error(int ret_code, std::format_string<Args...> fmt, Args &&...args) {
+      std::println(
+        stderr,
+        "{}",
+        terminal_nodes{}
+          .begin_format(err_fmt)
+          .append_node(fmt, std::forward<Args>(args)...)
+          .end_format()
+      );
+      std::exit(ret_code);
+    }
   };
 }
