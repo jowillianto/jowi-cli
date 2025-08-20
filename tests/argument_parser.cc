@@ -7,7 +7,7 @@ namespace test_lib = moderna::test_lib;
 #include <moderna/test_lib.hpp>
 #include <array>
 
-static auto app_id = cli::app_identity{"Random App", "", cli::app_version{0, 0, 0}};
+static auto app_id = cli::app_identity{.name = "Random App", .version = cli::app_version{0, 0, 0}};
 
 MODERNA_ADD_TEST(test_read_positional_args) {
   std::array argv = {"some_exec", "--output", "10"};
