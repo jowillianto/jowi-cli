@@ -15,7 +15,7 @@ MODERNA_ADD_TEST(test_read_positional_args) {
   app.add_argument("--output").require_value();
   app.parse_args();
   test_lib::assert_true(app.args().contains("--output"));
-  auto num_res = app.args().first_of("--output").transform(cli::parse_num<int>).value();
+  auto num_res = app.args().first_of("--output").transform(cli::parse_arg<int>).value();
   test_lib::assert_expected(num_res);
 }
 
@@ -33,7 +33,7 @@ MODERNA_ADD_TEST(test_double_convert) {
   app.add_argument("--value").require_value();
   app.parse_args();
   app.args();
-  auto num_res = app.args().first_of("--value").transform(cli::parse_num<double>).value();
+  auto num_res = app.args().first_of("--value").transform(cli::parse_arg<double>).value();
   test_lib::assert_expected(num_res);
   test_lib::assert_close(num_res.value(), 10.2332323);
 }
