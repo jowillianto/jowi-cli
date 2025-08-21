@@ -28,9 +28,12 @@ namespace moderna::cli {
     text_format help_fmt;
     app(app_identity id, int argc, const char **argv) :
       __args{raw_args{argc, argv}}, __parser{}, id{std::move(id)},
-      err_fmt{text_format{}.fg(color::red())}, help_fmt{text_format{}.fg(color::green())} {}
+      err_fmt{text_format{}.fg(color::red())}, help_fmt{text_format{}.fg(color::green())} {
+      add_argument();
+    }
 
     arg &add_argument() {
+      add_help_argument();
       return __parser.add_argument();
     }
     arg &add_argument(arg_key k) {
@@ -85,48 +88,55 @@ namespace moderna::cli {
         std::exit(1);
       }
     }
-    template <class T, class E, std::invocable<generic::error_formatter, std::string_view, int> F>
+    template <
+      class T,
+      class E,
+      std::invocable<generic::error_formatter, std::string_view, size_t> F>
       requires(std::constructible_from<generic::error_formatter, E>)
     T expect_or(
       std::expected<T, E> &&res, F &&f, std::source_location loc = std::source_location::current()
-    ) {
+    ) const {
       if (!res) {
         std::invoke(
           f,
           generic::error_formatter{std::move(res.error())},
           std::string_view{loc.file_name()},
-          loc.line()
+          static_cast<size_t>(loc.line())
         );
         std::exit(1);
       } else {
-        return std::move(res.value());
+        if constexpr (!std::same_as<T, void>) {
+          return std::move(res.value());
+        }
       }
     }
     template <class T, class E, class... Args>
       requires(std::constructible_from<generic::error_formatter, E>)
     T expect(
       std::expected<T, E> &&res,
-      std::format_string<generic::error_formatter &, std::string_view &, int &, Args...> fmt,
-      Args &&...args,
+      std::format_string<generic::error_formatter &, std::string_view &, size_t &, Args...> fmt,
       std::source_location loc = std::source_location::current()
-    ) {
+    ) const {
       return expect_or(
         std::move(res),
-        [&](auto e, auto fname, auto line) {
+        [&](generic::error_formatter e, std::string_view fname, size_t line) {
           std::println(
             stderr,
             "{}",
-            terminal_nodes{}
-              .begin_format(err_fmt)
-              .append_node(fmt, e, fname, line, std::forward<Args>(args)...)
-              .end_format()
+            terminal_nodes{}.begin_format(err_fmt).append_node(fmt, e, fname, line).end_format()
           );
         },
         loc
       );
     }
+    template <class T, class E>
+    T expect(
+      std::expected<T, E> &&res, std::source_location loc = std::source_location::current()
+    ) const {
+      return expect(std::move(res), "{2:} line {1:}: {0:}", loc);
+    }
     template <class... Args>
-    void error(int ret_code, std::format_string<Args...> fmt, Args &&...args) {
+    void error(int ret_code, std::format_string<Args...> fmt, Args &&...args) const {
       std::println(
         stderr,
         "{}",
@@ -137,8 +147,11 @@ namespace moderna::cli {
       );
       std::exit(ret_code);
     }
-    template <class... Args> void out(std::format_string<Args...> fmt, Args &&...args) {
+    template <class... Args> void out(std::format_string<Args...> fmt, Args &&...args) const {
       std::println(fmt, std::forward<Args>(args)...);
+    }
+    template <class... Args> void warn(std::format_string<Args...> fmt, Args &&...args) const {
+      std::println(stderr, fmt, std::forward<Args>(args)...);
     }
   };
 }

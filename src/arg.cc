@@ -3,12 +3,14 @@ module;
 #include <charconv>
 #include <concepts>
 #include <expected>
+#include <filesystem>
 #include <format>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
 export module moderna.cli:arg;
+import :app_version;
 import :terminal;
 import :parse_error;
 import :parsed_arg;
@@ -202,18 +204,22 @@ namespace moderna::cli {
   };
 
   export struct arg_empty_validator : public basic_arg_validator {
-    arg_empty_validator() {}
+  private:
+    bool __allow;
+
+  public:
+    arg_empty_validator(bool allow) : __allow{allow} {}
 
     std::optional<std::string> validator_id() const override {
       return "arg_empty_validator";
     }
     void help(terminal_nodes &nodes) const override {
-      nodes.append_node("allow_empty: false");
+      nodes.append_node("allow_empty: {}", __allow ? "true" : "false");
     }
     std::expected<void, parse_error> validate(
       std::optional<std::string_view> value
     ) const override {
-      if (!value) {
+      if (!__allow && !value) {
         return std::unexpected{parse_error{parse_error_type::NO_VALUE_GIVEN, ""}};
       }
       return {};
@@ -277,7 +283,10 @@ namespace moderna::cli {
       return add_validator(arg_count_validator::range(min_size, max_size));
     }
     arg &require_value() {
-      return add_validator(arg_empty_validator{});
+      return add_validator(arg_empty_validator{false});
+    }
+    arg &as_flag() {
+      return add_validator(arg_empty_validator{true});
     }
     arg &required() {
       return require_value().n_equal_to(1);
@@ -305,7 +314,7 @@ namespace moderna::cli {
     // Arg Validator Implementation
     void help(terminal_nodes &nodes) const override {
       if (__help_text) {
-        nodes.append_node(__help_text.value());
+        nodes.append_node(__help_text.value()).new_line();
       }
       for (const auto &vtor : __vtors) {
         vtor->help(nodes);
@@ -340,23 +349,59 @@ namespace moderna::cli {
   /*
     Shortcut Parse Functions (to number)
   */
-  export template <class num_type>
+  export template <class T> struct parse_shortcut {
+    std::expected<T, parse_error> from(std::string_view v) = delete;
+  };
+
+  template <class num_type>
     requires(std::floating_point<num_type> || std::integral<num_type>)
-  std::expected<num_type, parse_error> parse_num(std::string_view v) {
-    num_type num;
-    auto res = std::from_chars(v.begin(), v.end(), num);
-    if (res.ec == std::errc{}) {
-      return num;
-    } else {
-      return std::unexpected{parse_error{parse_error_type::INVALID_VALUE, "{} not a number", v}};
+  struct parse_shortcut<num_type> {
+    std::expected<num_type, parse_error> from(std::string_view v) {
+      num_type num;
+      auto res = std::from_chars(v.begin(), v.end(), num);
+      if (res.ec == std::errc{}) {
+        return num;
+      } else {
+        return std::unexpected{parse_error{parse_error_type::INVALID_VALUE, "{} not a number", v}};
+      }
     }
+  };
+
+  template <> struct parse_shortcut<app_version> {
+    std::expected<app_version, parse_error> from(std::string_view v) {
+      auto res = app_version::from_string(v);
+      if (!res) {
+        return std::unexpected{parse_error{parse_error_type::INVALID_VALUE, "{}", v}};
+      }
+      return std::move(res.value());
+    }
+  };
+
+  template <std::constructible_from<std::string_view> T> struct parse_shortcut<T> {
+    T from(std::string_view v) {
+      return T{v};
+    }
+  };
+
+  template <class T>
+  concept has_shortcut = requires(std::string_view v, parse_shortcut<T> parser) {
+    { parser.from(v) };
+  };
+
+  export template <has_shortcut T>
+    requires(std::constructible_from<parse_shortcut<T>>)
+  auto parse_arg(std::string_view v) {
+    return parse_shortcut<T>{}.from(v);
   }
 
   /*
     Instantiate
   */
-  template std::expected<int, parse_error> parse_num(std::string_view);
-  template std::expected<long long int, parse_error> parse_num(std::string_view);
-  template std::expected<float, parse_error> parse_num(std::string_view);
-  template std::expected<double, parse_error> parse_num(std::string_view);
+  template auto parse_arg<int>(std::string_view);
+  template auto parse_arg<long long int>(std::string_view);
+  template auto parse_arg<float>(std::string_view);
+  template auto parse_arg<double>(std::string_view);
+  template auto parse_arg<std::string>(std::string_view);
+  template auto parse_arg<std::filesystem::path>(std::string_view);
+  template auto parse_arg<app_version>(std::string_view);
 }
