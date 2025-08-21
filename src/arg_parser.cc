@@ -101,13 +101,13 @@ namespace moderna::cli {
 
   public:
     arg_parser() : __args{} {
-      add_argument();
+      add_argument().help("main executable");
     }
-    arg &add_argument(const arg_key &k) {
-      return __args.back().params.emplace(k, arg::flag());
+    arg &add_argument(arg_key k, arg arg = arg::flag()) {
+      return __args.back().params.emplace(k, std::move(arg));
     }
-    arg &add_argument(std::string_view k) {
-      return __args.back().params.emplace(arg_key::make(k).value(), arg::flag());
+    arg &add_argument(std::string_view k, arg arg = arg::flag()) {
+      return __args.back().params.emplace(arg_key::make(k).value(), std::move(arg));
     }
     arg &add_argument() {
       __args.emplace_back(arg::positional());

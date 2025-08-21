@@ -326,9 +326,7 @@ namespace moderna::cli {
     terminal_nodes &append_node(std::format_string<Args...> fmt, Args &&...args) {
       return append_node(terminal_node{fmt, std::forward<Args>(args)...});
     }
-
-    // Append sub-nodes
-    terminal_nodes &append_sub_node(terminal_nodes sub_nodes) {
+    terminal_nodes &append_node(terminal_nodes sub_nodes) {
       for (auto &&node : sub_nodes._nodes) {
         append_node(std::move(node));
       }

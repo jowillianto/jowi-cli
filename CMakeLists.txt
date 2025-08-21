@@ -59,3 +59,9 @@ if (MODERNA_INSTALL)
     )
   endif()
 endif()
+
+add_executable("${PROJECT_NAME}_example_echo" EXCLUDE_FROM_ALL "${CMAKE_CURRENT_LIST_DIR}/examples/echo.cc")
+target_link_libraries(${PROJECT_NAME}_example_echo PUBLIC moderna::cli)
+
+add_executable("${PROJECT_NAME}_example_actions" EXCLUDE_FROM_ALL "${CMAKE_CURRENT_LIST_DIR}/examples/actions.cc")
+target_link_libraries(${PROJECT_NAME}_example_actions PUBLIC moderna::cli)

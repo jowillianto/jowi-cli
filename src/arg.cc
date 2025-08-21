@@ -117,16 +117,15 @@ namespace moderna::cli {
       if (empty()) {
         return;
       }
-      nodes.append_node("Options: ");
+      nodes.append_node("Options: ").new_line();
       for (const auto &option : __options) {
         auto help_text = option.help_text();
         if (help_text) {
-          nodes.append_node("- {}: {}", option.value(), help_text.value());
+          nodes.append_node("- {}: {}", option.value(), help_text.value()).new_line();
         } else {
-          nodes.append_node("- {}: <no-help>", option.value());
+          nodes.append_node("- {}: <no-help>", option.value()).new_line();
         }
       }
-      nodes.new_line();
     }
 
     std::expected<void, parse_error> validate(
@@ -185,6 +184,7 @@ namespace moderna::cli {
       } else {
         nodes.append_node("Arg Count: {} <= n <= {}", min_size, max_size);
       }
+      nodes.new_line();
     }
     std::expected<void, parse_error> post_validate(
       std::optional<std::reference_wrapper<const arg_key>> key, parsed_arg &args
@@ -214,7 +214,9 @@ namespace moderna::cli {
       return "arg_empty_validator";
     }
     void help(terminal_nodes &nodes) const override {
-      nodes.append_node("allow_empty: {}", __allow ? "true" : "false");
+      if (__allow) {
+        nodes.append_node("Flag").new_line();
+      }
     }
     std::expected<void, parse_error> validate(
       std::optional<std::string_view> value
@@ -305,10 +307,14 @@ namespace moderna::cli {
 
     // Factory Functions
     static arg positional() {
-      return std::move(arg{}.n_equal_to(1));
+      arg arg{};
+      arg.required();
+      return arg;
     }
     static arg flag() {
-      return arg{};
+      arg arg{};
+      arg.as_flag().optional();
+      return arg;
     }
 
     // Arg Validator Implementation
@@ -318,7 +324,6 @@ namespace moderna::cli {
       }
       for (const auto &vtor : __vtors) {
         vtor->help(nodes);
-        nodes.new_line();
       }
     }
 
@@ -345,63 +350,4 @@ namespace moderna::cli {
       return {};
     }
   };
-
-  /*
-    Shortcut Parse Functions (to number)
-  */
-  export template <class T> struct parse_shortcut {
-    std::expected<T, parse_error> from(std::string_view v) = delete;
-  };
-
-  template <class num_type>
-    requires(std::floating_point<num_type> || std::integral<num_type>)
-  struct parse_shortcut<num_type> {
-    std::expected<num_type, parse_error> from(std::string_view v) {
-      num_type num;
-      auto res = std::from_chars(v.begin(), v.end(), num);
-      if (res.ec == std::errc{}) {
-        return num;
-      } else {
-        return std::unexpected{parse_error{parse_error_type::INVALID_VALUE, "{} not a number", v}};
-      }
-    }
-  };
-
-  template <> struct parse_shortcut<app_version> {
-    std::expected<app_version, parse_error> from(std::string_view v) {
-      auto res = app_version::from_string(v);
-      if (!res) {
-        return std::unexpected{parse_error{parse_error_type::INVALID_VALUE, "{}", v}};
-      }
-      return std::move(res.value());
-    }
-  };
-
-  template <std::constructible_from<std::string_view> T> struct parse_shortcut<T> {
-    T from(std::string_view v) {
-      return T{v};
-    }
-  };
-
-  template <class T>
-  concept has_shortcut = requires(std::string_view v, parse_shortcut<T> parser) {
-    { parser.from(v) };
-  };
-
-  export template <has_shortcut T>
-    requires(std::constructible_from<parse_shortcut<T>>)
-  auto parse_arg(std::string_view v) {
-    return parse_shortcut<T>{}.from(v);
-  }
-
-  /*
-    Instantiate
-  */
-  template auto parse_arg<int>(std::string_view);
-  template auto parse_arg<long long int>(std::string_view);
-  template auto parse_arg<float>(std::string_view);
-  template auto parse_arg<double>(std::string_view);
-  template auto parse_arg<std::string>(std::string_view);
-  template auto parse_arg<std::filesystem::path>(std::string_view);
-  template auto parse_arg<app_version>(std::string_view);
 }

@@ -97,5 +97,48 @@ namespace moderna::cli {
       __msg = __what;
       return *this;
     }
+
+    // Shortcut Factory Functions
+    template <class... Args>
+      requires(std::formattable<Args, char> && ...)
+    static parse_error invalid_value(std::format_string<Args...> fmt, Args &&...args) {
+      return parse_error(parse_error_type::INVALID_VALUE, fmt, std::forward<Args>(args)...);
+    }
+
+    template <class... Args>
+      requires(std::formattable<Args, char> && ...)
+    static parse_error duplicate_argument(std::format_string<Args...> fmt, Args &&...args) {
+      return parse_error(parse_error_type::DUPLICATE_ARGUMENT, fmt, std::forward<Args>(args)...);
+    }
+
+    template <class... Args>
+      requires(std::formattable<Args, char> && ...)
+    static parse_error no_value_given(std::format_string<Args...> fmt, Args &&...args) {
+      return parse_error(parse_error_type::NO_VALUE_GIVEN, fmt, std::forward<Args>(args)...);
+    }
+
+    template <class... Args>
+      requires(std::formattable<Args, char> && ...)
+    static parse_error not_required_argument(std::format_string<Args...> fmt, Args &&...args) {
+      return parse_error(parse_error_type::NOT_REQUIRED_ARGUMENT, fmt, std::forward<Args>(args)...);
+    }
+
+    template <class... Args>
+      requires(std::formattable<Args, char> && ...)
+    static parse_error not_argument_key(std::format_string<Args...> fmt, Args &&...args) {
+      return parse_error(parse_error_type::NOT_ARGUMENT_KEY, fmt, std::forward<Args>(args)...);
+    }
+
+    template <class... Args>
+      requires(std::formattable<Args, char> && ...)
+    static parse_error too_many_value_given(std::format_string<Args...> fmt, Args &&...args) {
+      return parse_error(parse_error_type::TOO_MANY_VALUE_GIVEN, fmt, std::forward<Args>(args)...);
+    }
+
+    template <class... Args>
+      requires(std::formattable<Args, char> && ...)
+    static parse_error not_positional(std::format_string<Args...> fmt, Args &&...args) {
+      return parse_error(parse_error_type::NOT_POSITIONAL, fmt, std::forward<Args>(args)...);
+    }
   };
 }

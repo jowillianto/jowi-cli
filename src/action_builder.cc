@@ -20,6 +20,7 @@ namespace moderna::cli {
     generic::key_vector<std::string, app_action> __actions;
     std::reference_wrapper<app> __app;
     std::reference_wrapper<arg> __arg;
+    size_t __id;
 
     void __update_args() {
       auto options = arg_options_validator{};
@@ -31,7 +32,8 @@ namespace moderna::cli {
 
   public:
     action_builder(app &app_, std::optional<std::string> help_text) :
-      __app{std::ref(app_)}, __arg{std::ref(__app.get().add_argument())} {
+      __app{std::ref(app_)}, __arg{std::ref(__app.get().add_argument())},
+      __id{__app.get().parser().size() - 1} {
       if (help_text) {
         __arg.get().help(help_text.value());
       }
@@ -48,7 +50,13 @@ namespace moderna::cli {
       auto &app = __app.get();
       __update_args();
       app.parse_args(false);
-      auto arg_value = __app.get().args().arg();
+      if (app.args().size() - 1 != __id) {
+        if (app.args().contains("-h") || app.args().contains("--help")) {
+          app.out(0, "{}", app.help());
+        }
+        app.error(1, "arg{}: {}", __id, parse_error_type::NO_VALUE_GIVEN);
+      }
+      auto arg_value = app.args().arg();
       auto action = __actions.get(arg_value);
       if (!action) {
         std::exit(1);
