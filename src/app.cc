@@ -83,11 +83,10 @@ namespace moderna::cli {
       for (auto arg = __parser.begin() + start_id; arg != __parser.end(); arg += 1) {
         size_t cur_arg_id = std::distance(__parser.begin(), arg);
         bool print_cur_pos = cur_arg_id > start_id;
-        size_t cur_indent = 0;
         auto sub_nodes =
           terminal_nodes{print_cur_pos ? static_cast<size_t>(2) : static_cast<size_t>(0)};
         if (print_cur_pos) {
-          nodes.append_node("arg{}", std::distance(__parser.begin(), arg)).new_line();
+          nodes.append_node("arg{}", cur_arg_id).new_line();
           arg->pos.help(sub_nodes);
         }
         if (!arg->empty()) {
