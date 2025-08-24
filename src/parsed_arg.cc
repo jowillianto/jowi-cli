@@ -54,6 +54,9 @@ namespace moderna::cli {
     size_t size() const noexcept {
       return __values.size();
     }
+    bool empty() const noexcept {
+      return __values.empty();
+    }
 
     // Query Functions
     constexpr std::optional<std::string_view> first_of(

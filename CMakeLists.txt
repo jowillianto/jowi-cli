@@ -23,6 +23,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC moderna::generic)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
 
 if (MODERNA_CLI_BUILD_TESTS) 
+  include(CTest)
   if (NOT TARGET moderna_test_lib)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/test-lib)
   endif()
@@ -63,3 +64,9 @@ target_link_libraries(${PROJECT_NAME}_example_echo PUBLIC moderna::cli)
 
 add_executable("${PROJECT_NAME}_example_actions" EXCLUDE_FROM_ALL "${CMAKE_CURRENT_LIST_DIR}/examples/actions.cc")
 target_link_libraries(${PROJECT_NAME}_example_actions PUBLIC moderna::cli)
+
+add_executable("${PROJECT_NAME}_example_ui" EXCLUDE_FROM_ALL "${CMAKE_CURRENT_LIST_DIR}/examples/ui.cc")
+target_link_libraries(${PROJECT_NAME}_example_ui PUBLIC moderna::cli)
+
+add_executable("${PROJECT_NAME}_example_csv" EXCLUDE_FROM_ALL "${CMAKE_CURRENT_LIST_DIR}/examples/csv.cc")
+target_link_libraries(${PROJECT_NAME}_example_csv PUBLIC moderna::cli)

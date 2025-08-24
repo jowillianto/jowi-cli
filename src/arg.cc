@@ -1,9 +1,7 @@
 module;
 #include <algorithm>
-#include <charconv>
 #include <concepts>
 #include <expected>
-#include <filesystem>
 #include <format>
 #include <optional>
 #include <string>
@@ -11,7 +9,7 @@ module;
 #include <vector>
 export module moderna.cli:arg;
 import :app_version;
-import :terminal;
+import :terminal_nodes;
 import :parse_error;
 import :parsed_arg;
 import :arg_key;
@@ -21,7 +19,7 @@ namespace moderna::cli {
     virtual std::optional<std::string> validator_id() const {
       return std::nullopt;
     }
-    virtual void help(terminal_nodes &nodes) const {}
+    virtual terminal_nodes &help(terminal_nodes &nodes) const = 0;
     virtual std::expected<void, parse_error> validate(std::optional<std::string_view> value) const {
       return {};
     }
@@ -113,19 +111,26 @@ namespace moderna::cli {
     std::optional<std::string> validator_id() const override {
       return "arg_options";
     }
-    void help(terminal_nodes &nodes) const override {
+    terminal_nodes &help(terminal_nodes &nodes) const override {
       if (empty()) {
-        return;
+        return nodes;
       }
-      nodes.append_node("Options: ").new_line();
+
+      nodes.append_nodes(terminal_node::text("Options: "), terminal_node::new_line());
       for (const auto &option : __options) {
         auto help_text = option.help_text();
         if (help_text) {
-          nodes.append_node("- {}: {}", option.value(), help_text.value()).new_line();
+          nodes.append_nodes(
+            terminal_node::text("- {}: {}", option.value(), help_text.value()),
+            terminal_node::new_line()
+          );
         } else {
-          nodes.append_node("- {}: <no-help>", option.value()).new_line();
+          nodes.append_nodes(
+            terminal_node::text("- {}: <no-help>", option.value()), terminal_node::new_line()
+          );
         }
       }
+      return nodes;
     }
 
     std::expected<void, parse_error> validate(
@@ -172,19 +177,26 @@ namespace moderna::cli {
     std::optional<std::string> validator_id() const override {
       return "arg_count_validator";
     }
-    void help(terminal_nodes &nodes) const override {
+    terminal_nodes &help(terminal_nodes &nodes) const override {
       if (min_size == max_size && min_size != 1) {
-        nodes.append_node("Arg Count: ={}", min_size);
+        nodes.append_nodes(
+          terminal_node::text("Arg Count: ={}", min_size), terminal_node::new_line()
+        );
       } else if (min_size == 0 && max_size == 1) {
-        nodes.append_node("Optional");
+        nodes.append_nodes(terminal_node::text("Optional"), terminal_node::new_line());
       } else if (min_size == 1 && max_size == 1) {
-        nodes.append_node("Required");
+        nodes.append_nodes(terminal_node::text("Required"), terminal_node::new_line());
       } else if (min_size == 1 && max_size == -1) {
-        nodes.append_node("Arg Count: >= {}", min_size);
+        nodes.append_nodes(
+          terminal_node::text("Arg Count: >= {}", min_size), terminal_node::new_line()
+        );
       } else {
-        nodes.append_node("Arg Count: {} <= n <= {}", min_size, max_size);
+        nodes.append_nodes(
+          terminal_node::text("Arg Count: {} <= n <= {}", min_size, max_size),
+          terminal_node::new_line()
+        );
       }
-      nodes.new_line();
+      return nodes;
     }
     std::expected<void, parse_error> post_validate(
       std::optional<std::reference_wrapper<const arg_key>> key, parsed_arg &args
@@ -213,10 +225,11 @@ namespace moderna::cli {
     std::optional<std::string> validator_id() const override {
       return "arg_empty_validator";
     }
-    void help(terminal_nodes &nodes) const override {
+    terminal_nodes &help(terminal_nodes &nodes) const override {
       if (__allow) {
-        nodes.append_node("Flag").new_line();
+        nodes.append_nodes(terminal_node::text("Flag"), terminal_node::new_line());
       }
+      return nodes;
     }
     std::expected<void, parse_error> validate(
       std::optional<std::string_view> value
@@ -318,13 +331,16 @@ namespace moderna::cli {
     }
 
     // Arg Validator Implementation
-    void help(terminal_nodes &nodes) const override {
-      if (__help_text) {
-        nodes.append_node(__help_text.value()).new_line();
-      }
+    terminal_nodes &help(terminal_nodes &nodes) const override {
+      nodes.append_nodes(
+        __help_text
+          ? terminal_nodes{terminal_node::text("{}", __help_text.value()), terminal_node::new_line()}
+          : terminal_nodes{}
+      );
       for (const auto &vtor : __vtors) {
         vtor->help(nodes);
       }
+      return nodes;
     }
 
     std::expected<void, parse_error> validate(

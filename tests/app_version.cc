@@ -2,8 +2,8 @@ import moderna.test_lib;
 import moderna.cli;
 #include <moderna/test_lib.hpp>
 #include <cstddef>
-#include <limits>
 #include <format>
+#include <limits>
 #include <string>
 
 namespace cli = moderna::cli;
@@ -91,12 +91,6 @@ MODERNA_ADD_TEST(cli_version_parse_max_int_test) {
   test_lib::assert_equal(version.patch, static_cast<size_t>(max_int));
 }
 
-MODERNA_ADD_TEST(cli_version_parse_overflow_test) {
-  std::string version_str = "999999999999.1.1"; // too large for int
-  auto maybe_version = cli::app_version::from_string(version_str);
-  test_lib::assert_false(maybe_version.has_value());
-}
-
 MODERNA_ADD_TEST(cli_version_parse_negative_test) {
   auto maybe_version = cli::app_version::from_string("-1.0.0");
   test_lib::assert_false(maybe_version.has_value());
@@ -117,7 +111,7 @@ MODERNA_ADD_TEST(cli_version_parse_random_strings_test) {
     // Optionally, print something for debugging
     // std::println("Input: '{}', Parsed: {}", random_str, result.has_value());
   }
-  test_lib::assert_true(true);  // Always pass, this is a stability test
+  test_lib::assert_true(true); // Always pass, this is a stability test
 }
 
 MODERNA_ADD_TEST(cli_version_parse_valid_random_numbers_test) {

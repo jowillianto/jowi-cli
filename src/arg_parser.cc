@@ -95,7 +95,7 @@ namespace moderna::cli {
     }
   };
 
-  struct arg_parser {
+  export struct arg_parser {
   private:
     std::vector<arg_decl> __args;
 

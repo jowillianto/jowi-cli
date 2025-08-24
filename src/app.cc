@@ -3,6 +3,7 @@ module;
 #include <expected>
 #include <format>
 #include <print>
+#include <ranges>
 #include <source_location>
 #include <string>
 #include <string_view>
@@ -14,7 +15,7 @@ import :arg_parser;
 import :parsed_arg;
 import :raw_args;
 import :app_identity;
-import :terminal;
+import :terminal_nodes;
 
 namespace moderna::cli {
   export struct app {
@@ -58,49 +59,50 @@ namespace moderna::cli {
     terminal_nodes help() const {
       auto nodes = terminal_nodes{};
       // Print the identity
-      nodes.append_node("{} v{}", id.name, id.version).new_line();
-      if (id.description.length() != 0) {
-        nodes.append_node("{}", id.description).new_line();
-      }
-      if (id.author.has_value()) {
-        nodes.append_node("By {}", id.author.value()).new_line();
-      }
-      if (id.license.has_value()) {
-        nodes.append_node("License: {}", id.license.value()).new_line();
-      }
-      nodes.new_line();
-      // Help Formatting
-      // Print Current Parsed Arguments
-      for (auto arg = args().begin(); arg != args().end(); arg += 1) {
-        nodes.append_node("{} ", arg->value);
-      }
-      if (args().size() != 0) {
-        nodes.new_line();
-      }
-      // The actual help arguments, this should start printing from arg_size - 1.
-      nodes.begin_format(help_fmt);
+      nodes.append_nodes(
+        terminal_node::text("{} v{}", id.name, id.version),
+        terminal_node::new_line(),
+        id.description.length() != 0
+          ? terminal_nodes{terminal_node::text("{}", id.description), terminal_node::new_line()}
+          : terminal_nodes{},
+        id.author
+          ? terminal_nodes{terminal_node::text("By {}", id.author.value()), terminal_node::new_line()}
+          : terminal_nodes{},
+        id.license
+          ? terminal_nodes{terminal_node::text("License: {}", id.license.value()), terminal_node::new_line()}
+          : terminal_nodes{},
+        terminal_node::new_line(),
+        std::ranges::transform_view{
+          args(), [](auto &&arg) { return terminal_node::text("{}", arg.value); }
+        },
+        args().size() == 0 ? terminal_nodes{} : terminal_nodes{terminal_node::new_line()},
+        terminal_node::format_begin(help_fmt)
+      );
       size_t start_id = std::max(0, static_cast<int>(args().size()) - 1);
       for (auto arg = __parser.begin() + start_id; arg != __parser.end(); arg += 1) {
         size_t cur_arg_id = std::distance(__parser.begin(), arg);
         bool print_cur_pos = cur_arg_id > start_id;
-        auto sub_nodes =
-          terminal_nodes{print_cur_pos ? static_cast<size_t>(2) : static_cast<size_t>(0)};
+        auto sub_nodes = terminal_nodes{
+          print_cur_pos ? static_cast<std::uint8_t>(2) : static_cast<std::uint8_t>(0)
+        };
         if (print_cur_pos) {
-          nodes.append_node("arg{}", cur_arg_id).new_line();
+          nodes.append_nodes(terminal_node::text("arg{}", cur_arg_id), terminal_node::new_line());
           arg->pos.help(sub_nodes);
         }
-        if (!arg->empty()) {
-          sub_nodes.append_node("Keyword Arguments: ").new_line();
-        }
+        nodes.append_nodes(
+          !(arg->empty())
+            ? terminal_nodes{terminal_node::text("Keyword Arguments: "), terminal_node::new_line()}
+            : terminal_nodes{}
+        );
         for (const auto &[k, arg] : (*arg)) {
-          sub_nodes.append_node("{}: ", k).new_line();
+          sub_nodes.append_nodes(terminal_node::text("{}: ", k), terminal_node::new_line());
           auto sub_sub_nodes = terminal_nodes{2};
           arg.help(sub_sub_nodes);
-          sub_nodes.append_node(std::move(sub_sub_nodes));
+          sub_nodes.append_nodes(std::move(sub_sub_nodes));
         }
-        nodes.append_node(std::move(sub_nodes));
+        nodes.append_nodes(std::move(sub_nodes));
       }
-      nodes.end_format();
+      nodes.append_nodes(terminal_node::format_end());
       return nodes;
     }
 
@@ -115,16 +117,20 @@ namespace moderna::cli {
         .as_flag();
     }
 
-    void parse_args(bool auto_help = true) {
+    std::expected<void, parse_error> parse_args(bool auto_help = true, bool auto_exit = true) {
       auto res = __parser.parse(__args);
       auto help_arg_count = __args.count("-h") + __args.count("--help");
       if (help_arg_count != 0 && auto_help) {
         std::println("{}", help());
         std::exit(0);
       }
-      if (!res) {
+      if (!res && auto_exit) {
         error(1, "{}", res.error().what());
       }
+      if (!res) {
+        return std::unexpected{std::move(res.error())};
+      }
+      return {};
     }
     template <
       class T,
@@ -152,10 +158,11 @@ namespace moderna::cli {
         error(
           1,
           "{}",
-          terminal_nodes{}
-            .begin_format(err_fmt)
-            .append_node(fmt, e, std::forward<Args>(args)...)
-            .end_format()
+          terminal_nodes{
+            terminal_node::format_begin(err_fmt),
+            terminal_node::text(fmt, std::forward<Args>(args)...),
+            terminal_node::format_end()
+          }
         );
       });
     }
@@ -170,10 +177,11 @@ namespace moderna::cli {
       std::println(
         stderr,
         "{}",
-        terminal_nodes{}
-          .begin_format(err_fmt)
-          .append_node(fmt, std::forward<Args>(args)...)
-          .end_format()
+        terminal_nodes{
+          terminal_node::format_begin(err_fmt),
+          terminal_node::text(fmt, std::forward<Args>(args)...),
+          terminal_node::format_end()
+        }
       );
       std::exit(ret_code);
     }
