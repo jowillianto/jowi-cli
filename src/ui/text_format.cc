@@ -2,10 +2,10 @@ module;
 #include <format>
 #include <optional>
 #include <unordered_set>
-export module moderna.cli:terminal_format;
-import :terminal_color;
+export module jowi.cli.ui:text_format;
+import :color;
 
-namespace moderna::cli {
+namespace jowi::cli::ui {
   export enum struct text_effect {
     bold,
     dim,
@@ -86,37 +86,37 @@ namespace moderna::cli {
   };
 }
 
-template <class char_type> struct std::formatter<moderna::cli::text_effect, char_type> {
+template <class char_type> struct std::formatter<jowi::cli::ui::text_effect, char_type> {
   constexpr auto parse(auto &ctx) const {
     return ctx.begin();
   }
-  constexpr auto format(const moderna::cli::text_effect &e, auto &ctx) const {
+  constexpr auto format(const jowi::cli::ui::text_effect &e, auto &ctx) const {
     switch (e) {
-      case moderna::cli::text_effect::bold:
+      case jowi::cli::ui::text_effect::bold:
         std::format_to(ctx.out(), "\x1b[1m");
         break;
-      case moderna::cli::text_effect::dim:
+      case jowi::cli::ui::text_effect::dim:
         std::format_to(ctx.out(), "\x1b[2m");
         break;
-      case moderna::cli::text_effect::italic:
+      case jowi::cli::ui::text_effect::italic:
         std::format_to(ctx.out(), "\x1b[3m");
         break;
-      case moderna::cli::text_effect::underline:
+      case jowi::cli::ui::text_effect::underline:
         std::format_to(ctx.out(), "\x1b[4m");
         break;
-      case moderna::cli::text_effect::slow_blink:
+      case jowi::cli::ui::text_effect::slow_blink:
         std::format_to(ctx.out(), "\x1b[5m");
         break;
-      case moderna::cli::text_effect::rapid_blink:
+      case jowi::cli::ui::text_effect::rapid_blink:
         std::format_to(ctx.out(), "\x1b[6m");
         break;
-      case moderna::cli::text_effect::reverse:
+      case jowi::cli::ui::text_effect::reverse:
         std::format_to(ctx.out(), "\x1b[7m");
         break;
-      case moderna::cli::text_effect::strikethrough:
+      case jowi::cli::ui::text_effect::strikethrough:
         std::format_to(ctx.out(), "\x1b[9m");
         break;
-      case moderna::cli::text_effect::double_underline:
+      case jowi::cli::ui::text_effect::double_underline:
         std::format_to(ctx.out(), "\x1b[21m");
         break;
     }
@@ -124,11 +124,11 @@ template <class char_type> struct std::formatter<moderna::cli::text_effect, char
   }
 };
 
-template <class char_type> struct std::formatter<moderna::cli::text_format, char_type> {
+template <class char_type> struct std::formatter<jowi::cli::ui::text_format, char_type> {
   constexpr auto parse(auto &ctx) const {
     return ctx.begin();
   }
-  constexpr auto format(const moderna::cli::text_format &fmt, auto &ctx) const {
+  constexpr auto format(const jowi::cli::ui::text_format &fmt, auto &ctx) const {
     auto bg = fmt.get_bg();
     auto fg = fmt.get_fg();
     if (bg) {

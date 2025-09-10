@@ -6,11 +6,11 @@ module;
 #include <optional>
 #include <string>
 #include <string_view>
-export module moderna.cli:arg_key;
-import moderna.generic;
+export module jowi.cli:arg_key;
+import jowi.generic;
 import :parse_error;
 
-namespace moderna::cli {
+namespace jowi::cli {
   export struct arg_key {
   private:
     std::string __value;
@@ -63,11 +63,11 @@ namespace moderna::cli {
   };
 }
 
-template <class char_type> struct std::formatter<moderna::cli::arg_key, char_type> {
+template <class char_type> struct std::formatter<jowi::cli::arg_key, char_type> {
   constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
-  constexpr auto format(const moderna::cli::arg_key &k, auto &ctx) const {
+  constexpr auto format(const jowi::cli::arg_key &k, auto &ctx) const {
     return std::format_to(ctx.out(), "{}", k.value());
   }
 };

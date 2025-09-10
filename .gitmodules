@@ -1,6 +1,9 @@
-[submodule "libs/moderna-generic"]
-	path = libs/moderna-generic
-	url = https://github.com/jowillianto/moderna-generic
+[submodule "libs/jowi-generic"]
+	path = libs/jowi-generic
+	url = https://github.com/jowillianto/jowi-generic
 [submodule "libs/test-lib"]
 	path = libs/test-lib
 	url = https://github.com/jowillianto/test-lib
+[submodule "libs/reflect-cpp"]
+	path = libs/reflect-cpp
+	url = https://github.com/getml/reflect-cpp

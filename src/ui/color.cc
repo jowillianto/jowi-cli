@@ -3,13 +3,9 @@ module;
 #include <cstdint>
 #include <format>
 #include <variant>
-export module moderna.cli:terminal_color;
+export module jowi.cli.ui:color;
 
-namespace moderna::cli {
-#include <concepts>
-#include <cstdint>
-#include <variant>
-
+namespace jowi::cli::ui {
   enum struct basic_color {
     black,
     red,
@@ -132,15 +128,15 @@ namespace moderna::cli {
   };
 }
 
-template <class char_type> struct std::formatter<moderna::cli::color, char_type> {
+template <class char_type> struct std::formatter<jowi::cli::ui::color, char_type> {
   constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
 
-  auto format(const moderna::cli::color &c, auto &ctx) const {
-    using moderna::cli::basic_color;
-    using moderna::cli::indexed_color;
-    using moderna::cli::rgb_color;
+  auto format(const jowi::cli::ui::color &c, auto &ctx) const {
+    using jowi::cli::ui::basic_color;
+    using jowi::cli::ui::indexed_color;
+    using jowi::cli::ui::rgb_color;
 
     c.visit([&ctx](const auto &variant) {
       using T = std::decay_t<decltype(variant)>;

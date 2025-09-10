@@ -5,14 +5,14 @@ module;
 #include <optional>
 #include <string_view>
 #include <vector>
-export module moderna.cli:arg_parser;
-import moderna.generic;
+export module jowi.cli:arg_parser;
+import jowi.generic;
 import :arg_key;
 import :parsed_arg;
 import :arg;
 import :parse_error;
 
-namespace moderna::cli {
+namespace jowi::cli {
   template <class T> using ref = std::reference_wrapper<T>;
 
   struct arg_decl {

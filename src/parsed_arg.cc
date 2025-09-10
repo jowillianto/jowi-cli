@@ -4,12 +4,12 @@ module;
 #include <ranges>
 #include <string_view>
 #include <vector>
-export module moderna.cli:parsed_arg;
-import moderna.generic;
+export module jowi.cli:parsed_arg;
+import jowi.generic;
 import :raw_args;
 import :arg_key;
 
-namespace moderna::cli {
+namespace jowi::cli {
 
   using param_pair = std::pair<arg_key, std::string_view>;
   struct positional_parsed_arg {
@@ -71,11 +71,11 @@ namespace moderna::cli {
     constexpr bool contains(const generic::is_comparable<arg_key> auto &key) const noexcept {
       return first_of(key).has_value();
     }
-    constexpr auto filter(const generic::is_comparable<arg_key> auto &key) const noexcept {
+    constexpr auto filter(generic::is_comparable<arg_key> auto key) const noexcept {
       return std::ranges::transform_view{
         std::ranges::filter_view{
           std::ranges::subrange{param_beg(), param_end()},
-          [&](const param_pair &p) { return p.first == key; }
+          [key = std::move(key)](const param_pair &p) { return p.first == key; }
         },
         &param_pair::second
       };
@@ -99,4 +99,4 @@ namespace moderna::cli {
       return raw();
     }
   };
-} // namespace moderna::cli
+} // namespace jowi::cli

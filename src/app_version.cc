@@ -4,10 +4,10 @@ module;
 #include <format>
 #include <optional>
 #include <string_view>
-export module moderna.cli:app_version;
+export module jowi.cli:app_version;
 import :arg_shortcut;
 import :parse_error;
-namespace moderna::cli {
+namespace jowi::cli {
   export struct app_version {
     size_t major;
     size_t minor;
@@ -74,7 +74,7 @@ namespace moderna::cli {
   template auto parse_arg<app_version>(std::string_view);
 }
 
-namespace cli = moderna::cli;
+namespace cli = jowi::cli;
 
 template <class char_type> struct std::formatter<cli::app_version, char_type> {
   constexpr auto parse(auto &ctx) {

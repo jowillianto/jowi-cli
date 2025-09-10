@@ -1,72 +1,127 @@
 cmake_minimum_required(VERSION 3.28)
-project (moderna_cli)
+project (jowi_cli)
 set (CMAKE_CXX_STANDARD 23)
 set (CMAKE_CXX_STANDARD_REQUIRED true)
 set (CMAKE_CXX_SCAN_FOR_MODULES true)
 
-option (MODERNA_CLI_BUILD_TESTS "Build Tests" OFF)
+option (JOWI_CLI_BUILD_TESTS "Build Tests" OFF)
+option (JOWI_CLI_BUILD_BODAT "Build Bodat, the C++ modules package manager. " OFF)
 
-if (NOT TARGET moderna::generic)
-  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/moderna-generic)
+if (NOT TARGET jowi::generic)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/jowi-generic)
 endif()
 
-add_library(${PROJECT_NAME})
-add_library(moderna::cli ALIAS ${PROJECT_NAME})
-file(GLOB ${PROJECT_NAME}_src
-  ${CMAKE_CURRENT_LIST_DIR}/src/*.cc
+add_library(jowi_cli_ui)
+add_library(jowi::cli::ui ALIAS jowi_cli_ui)
+target_sources(jowi_cli_ui
+  PUBLIC
+    FILE_SET CXX_MODULES 
+      FILES   
+        "${CMAKE_CURRENT_LIST_DIR}/src/ui/color.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/ui/main.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/ui/node.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/ui/text_format.cc"
 )
+target_link_libraries(jowi_cli_ui PUBLIC jowi::generic)
+target_compile_features(jowi_cli_ui PUBLIC cxx_std_23)
+
+add_library(${PROJECT_NAME})
+add_library(jowi::cli ALIAS ${PROJECT_NAME})
 target_sources(${PROJECT_NAME}
   PUBLIC
-    FILE_SET CXX_MODULES FILES ${${PROJECT_NAME}_src}
+    FILE_SET CXX_MODULES 
+      FILES 
+        "${CMAKE_CURRENT_LIST_DIR}/src/action_builder.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/app_identity.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/app_version.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/app.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/arg_key.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/arg_parser.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/arg_shortcut.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/arg.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/env.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/main.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/parse_error.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/parsed_arg.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/raw_args.cc"
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC moderna::generic)
+target_link_libraries(${PROJECT_NAME} PUBLIC jowi::generic jowi::cli::ui)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
 
-if (MODERNA_CLI_BUILD_TESTS) 
+add_library(jowi_crogger)
+add_library(jowi::crogger ALIAS jowi_crogger)
+target_sources(jowi_crogger
+  PUBLIC
+    FILE_SET CXX_MODULES 
+      FILES   
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_error.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_metadata.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_status.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/logger.cc"
+)
+target_link_libraries(jowi_crogger PUBLIC jowi::generic jowi::cli::ui)
+target_compile_features(jowi_crogger PUBLIC cxx_std_23)
+
+if (JOWI_CLI_BUILD_BODAT)
+  set(REFLECTCPP_TOML ON)
+  set(REFLECTCPP_USE_STD_EXPECTED ON)
+  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/reflect-cpp)
+  add_executable(bodat ${CMAKE_CURRENT_LIST_DIR}/bodat/main.cc)
+  target_include_directories(bodat PRIVATE ${CMAKE_CURRENT_LIST_DIR}/bodat)
+  target_compile_definitions(bodat PRIVATE REFLECTCPP_USE_STD_EXPECTED)
+  target_link_libraries(bodat 
+    PUBLIC 
+      jowi::cli
+      jowi::crogger
+      reflectcpp
+  )
+endif()
+
+if (JOWI_CLI_BUILD_TESTS) 
   include(CTest)
-  if (NOT TARGET moderna_test_lib)
+  if (NOT TARGET jowi_test_lib)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/test-lib)
   endif()
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/tests)
 endif()
 
-if (MODERNA_INSTALL)
+if (JOWI_INSTALL)
   include(GNUInstallDirs)
-  set (MODERNA_COMPONENT_NAME "cli")
+  set (JOWI_COMPONENT_NAME "cli")
   set_property(
     TARGET ${PROJECT_NAME} 
-    PROPERTY EXPORT_NAME ${MODERNA_COMPONENT_NAME}
+    PROPERTY EXPORT_NAME ${JOWI_COMPONENT_NAME}
   )
   install (
     TARGETS ${PROJECT_NAME}
-    EXPORT moderna
+    EXPORT jowi
     FILE_SET 
       CXX_MODULES 
-      DESTINATION ${CMAKE_INSTALL_PREFIX}/cxx_modules/moderna/${MODERNA_COMPONENT_NAME}
-      COMPONENT ${MODERNA_COMPONENT_NAME}_file_set
+      DESTINATION ${CMAKE_INSTALL_PREFIX}/cxx_modules/jowi/${JOWI_COMPONENT_NAME}
+      COMPONENT ${JOWI_COMPONENT_NAME}_file_set
     CXX_MODULES_BMI 
-      COMPONENT ${MODERNA_COMPONENT_NAME}
-      DESTINATION ${CMAKE_INSTALL_PREFIX}/cxx_modules/moderna/${MODERNA_COMPONENT_NAME}
+      COMPONENT ${JOWI_COMPONENT_NAME}
+      DESTINATION ${CMAKE_INSTALL_PREFIX}/cxx_modules/jowi/${JOWI_COMPONENT_NAME}
   )
-  if (NOT MODERNA_GLOBAL_INSTALL)
+  if (NOT JOWI_GLOBAL_INSTALL)
     install (
-      EXPORT moderna
-      DESTINATION ${CMAKE_INSTALL_LIBDIR}/moderna
-      FILE moderna-config.cmake
-      NAMESPACE moderna::
-      CXX_MODULES_DIRECTORY cxx_modules/moderna
+      EXPORT jowi
+      DESTINATION ${CMAKE_INSTALL_LIBDIR}/jowi
+      FILE jowi-config.cmake
+      NAMESPACE jowi::
+      CXX_MODULES_DIRECTORY cxx_modules/jowi
     )
   endif()
 endif()
 
 add_executable("${PROJECT_NAME}_example_echo" EXCLUDE_FROM_ALL "${CMAKE_CURRENT_LIST_DIR}/examples/echo.cc")
-target_link_libraries(${PROJECT_NAME}_example_echo PUBLIC moderna::cli)
+target_link_libraries(${PROJECT_NAME}_example_echo PUBLIC jowi::cli)
 
 add_executable("${PROJECT_NAME}_example_actions" EXCLUDE_FROM_ALL "${CMAKE_CURRENT_LIST_DIR}/examples/actions.cc")
-target_link_libraries(${PROJECT_NAME}_example_actions PUBLIC moderna::cli)
+target_link_libraries(${PROJECT_NAME}_example_actions PUBLIC jowi::cli)
 
 add_executable("${PROJECT_NAME}_example_ui" EXCLUDE_FROM_ALL "${CMAKE_CURRENT_LIST_DIR}/examples/ui.cc")
-target_link_libraries(${PROJECT_NAME}_example_ui PUBLIC moderna::cli)
+target_link_libraries(${PROJECT_NAME}_example_ui PUBLIC jowi::cli)
 
 add_executable("${PROJECT_NAME}_example_csv" EXCLUDE_FROM_ALL "${CMAKE_CURRENT_LIST_DIR}/examples/csv.cc")
-target_link_libraries(${PROJECT_NAME}_example_csv PUBLIC moderna::cli)
+target_link_libraries(${PROJECT_NAME}_example_csv PUBLIC jowi::cli)

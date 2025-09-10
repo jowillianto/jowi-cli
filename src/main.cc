@@ -1,4 +1,4 @@
-export module moderna.cli;
+export module jowi.cli;
 export import :arg_key;
 export import :arg;
 export import :parsed_arg;
@@ -8,6 +8,3 @@ export import :app;
 export import :app_identity;
 export import :action_builder;
 export import :arg_shortcut;
-export import :terminal_color;
-export import :terminal_format;
-export import :terminal_nodes;

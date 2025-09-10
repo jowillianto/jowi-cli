@@ -4,10 +4,10 @@ module;
 #include <expected>
 #include <filesystem>
 #include <string_view>
-export module moderna.cli:arg_shortcut;
+export module jowi.cli:arg_shortcut;
 import :parse_error;
 
-namespace moderna::cli {
+namespace jowi::cli {
   /*
     Shortcut Parse Functions (to number)
   */

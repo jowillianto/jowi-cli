@@ -3,9 +3,10 @@ module;
 #include <format>
 #include <string>
 #include <string_view>
-export module moderna.cli:parse_error;
+export module jowi.cli:parse_error;
+import jowi.generic;
 
-namespace moderna::cli {
+namespace jowi::cli {
   export enum struct parse_error_type {
     INVALID_VALUE,
     DUPLICATE_ARGUMENT,
@@ -20,7 +21,7 @@ namespace moderna::cli {
 /*
   Formatter implementation for parse_error_type
 */
-namespace cli = moderna::cli;
+namespace cli = jowi::cli;
 template <class char_type> struct std::formatter<cli::parse_error_type, char_type> {
   constexpr auto parse(auto &ctx) {
     return ctx.begin();
@@ -57,31 +58,26 @@ template <class char_type> struct std::formatter<cli::parse_error_type, char_typ
   parse_error
   wraps error and gives it an error type. F
 */
-namespace moderna::cli {
+namespace jowi::cli {
   export struct parse_error : public std::exception {
     parse_error_type __t;
-    std::string __what;
-    std::string_view __msg;
+    generic::fixed_string<64> __msg;
+    std::string_view __msg_only;
 
   public:
     template <class... Args>
       requires(std::formattable<Args, char> && ...)
-    parse_error(parse_error_type t, std::format_string<Args...> fmt, Args &&...args) :
-      __t{t}, __what{} {
-      auto it = std::back_inserter(__what);
-      std::format_to(it, "{}: ", t);
-      auto type_end = __what.length();
-      std::format_to(it, fmt, std::forward<Args>(args)...);
-      __msg = std::string_view{__what.begin() + type_end, __what.end()};
+    parse_error(parse_error_type t, std::format_string<Args...> fmt, Args &&...args) noexcept :
+      __t{t}, __msg{} {
+      __msg.emplace_format("{}: ", t);
+      auto msg_begin = __msg.end();
+      __msg.emplace_format(fmt, std::forward<Args>(args)...);
+      __msg_only = std::string_view{msg_begin, __msg.end()};
     }
-    parse_error(parse_error_type t, std::string_view msg) : parse_error(t, "{}", msg) {}
+    parse_error(parse_error_type t, std::string_view msg) noexcept : parse_error(t, "{}", msg) {}
 
     const char *what() const noexcept {
-      return __what.c_str();
-    }
-
-    std::string_view msg() const noexcept {
-      return __msg;
+      return __msg.c_str();
     }
 
     parse_error_type err_type() const noexcept {
@@ -92,8 +88,10 @@ namespace moderna::cli {
     parse_error &reformat(
       std::format_string<parse_error_type &, std::string_view &, Args...> fmt, Args &&...args
     ) {
-      __what = std::format(fmt, __t, __msg, std::forward<Args>(args)...);
-      __msg = __what;
+      generic::fixed_string<64> new_msg;
+      new_msg.emplace_format(fmt, __t, __msg_only, std::forward<Args>(args)...);
+      __msg_only = std::string_view{new_msg.begin(), new_msg.end()};
+      __msg = new_msg;
       return *this;
     }
 

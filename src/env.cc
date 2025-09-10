@@ -6,11 +6,11 @@ module;
 #include <optional>
 #include <string>
 #include <string_view>
-export module moderna.cli:env;
-import moderna.generic;
+export module jowi.cli:env;
+import jowi.generic;
 import :parse_error;
 
-namespace moderna::cli {
+namespace jowi::cli {
   struct app_env {
   private:
     generic::key_vector<std::string, std::string> __env;

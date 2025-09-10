@@ -2,10 +2,10 @@ module;
 #include <format>
 #include <optional>
 #include <string>
-export module moderna.cli:app_identity;
+export module jowi.cli:app_identity;
 import :app_version;
 
-namespace moderna::cli {
+namespace jowi::cli {
   export struct app_identity {
     std::string name;
     std::string description;
@@ -15,7 +15,7 @@ namespace moderna::cli {
   };
 }
 
-namespace cli = moderna::cli;
+namespace cli = jowi::cli;
 
 template <class char_type> struct std::formatter<cli::app_identity, char_type> {
   constexpr auto parse(auto &ctx) {

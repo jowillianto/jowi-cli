@@ -34,25 +34,25 @@ int main(int argc, const char **argv) {
   bool is_first_line = true;
   while (std::getline(csv_file, line, '\n')) {
     auto comma_sep = std::ranges::transform_view(std::ranges::split_view(line, ','), [](auto &&s) {
-      return cli::terminal_node::text("{}", std::string_view{s.begin(), s.end()});
+      return cli::cli_node::text("{}", std::string_view{s.begin(), s.end()});
     });
     if (is_first_line && headers) {
       app.out(
         "{}",
-        cli::terminal_nodes{
-          cli::terminal_node::format_begin(
+        cli::cli_nodes{
+          cli::cli_node::format_begin(
             cli::text_format{}
               .effect(cli::text_effect::bold)
               .effect(cli::text_effect::underline)
               .fg(cli::color::bright_blue())
           ),
           comma_sep,
-          cli::terminal_node::format_end()
+          cli::cli_node::format_end()
         }
       );
       is_first_line = false;
     } else {
-      app.out("{}", cli::terminal_nodes{comma_sep});
+      app.out("{}", cli::cli_nodes{comma_sep});
     }
   }
 }

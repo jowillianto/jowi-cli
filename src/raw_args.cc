@@ -1,9 +1,9 @@
 module;
 #include <optional>
 #include <string_view>
-export module moderna.cli:raw_args;
+export module jowi.cli:raw_args;
 
-namespace moderna::cli {
+namespace jowi::cli {
   struct raw_args_iterator {
   private:
     int __cur;

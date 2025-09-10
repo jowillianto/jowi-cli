@@ -2,11 +2,11 @@ module;
 #include <cstdlib>
 #include <functional>
 #include <string>
-export module moderna.cli:action_builder;
-import moderna.generic;
+export module jowi.cli:action_builder;
+import jowi.generic;
 import :app;
 
-namespace moderna::cli {
+namespace jowi::cli {
   struct app_action {
     std::function<void(app &)> action;
     std::string help_text;
@@ -20,15 +20,8 @@ namespace moderna::cli {
     generic::key_vector<std::string, app_action> __actions;
     std::reference_wrapper<app> __app;
     std::reference_wrapper<arg> __arg;
+    bool __arg_updated;
     size_t __id;
-
-    void __update_args() {
-      auto options = arg_options_validator{};
-      for (const auto &[n, a] : __actions) {
-        options.add_option(n, a.help_text);
-      }
-      __arg.get().add_validator(std::move(options));
-    }
 
   public:
     action_builder(app &app_, std::optional<std::string> help_text) :
@@ -37,18 +30,32 @@ namespace moderna::cli {
       if (help_text) {
         __arg.get().help(help_text.value());
       }
+      __arg_updated = false;
     }
 
     template <class F>
       requires(std::is_invocable_r_v<void, F, app &>)
     action_builder &add_action(std::string_view name, std::string help_text, F &&f) {
       __actions.emplace(name, app_action{f, std::move(help_text)});
+      __arg_updated = false;
+      return *this;
+    }
+
+    action_builder &update_args() {
+      if (!__arg_updated) {
+        auto options = arg_options_validator{};
+        for (const auto &[n, a] : __actions) {
+          options.add_option(n, a.help_text);
+        }
+        __arg.get().add_validator(std::move(options));
+        __arg_updated = true;
+      }
       return *this;
     }
 
     void run() {
       auto &app = __app.get();
-      __update_args();
+      update_args();
       app.parse_args(false);
       if (app.args().size() - 1 != __id) {
         if (app.args().contains("-h") || app.args().contains("--help")) {
