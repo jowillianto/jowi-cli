@@ -28,11 +28,17 @@ namespace jowi::cli {
       if (parse_positional && opt_current_arg.has_value()) {
         std::string_view current_arg = opt_current_arg.value();
         if (arg_key::is_arg_key(current_arg)) {
-          return std::unexpected{parse_error{parse_error_type::INVALID_VALUE, "arg{}", pos_id}};
+          return std::unexpected{parse_error{
+            parse_error_type::INVALID_VALUE,
+            "arg{} - expected positional found keyword argument",
+            pos_id
+          }};
         }
         auto res = pos.validate(current_arg);
         if (!res) {
-          return std::unexpected{res.error().reformat("{2:}: {0:} {1:}", pos_id)};
+          return std::unexpected{
+            parse_error{res.error().err_type(), "arg{} - {}", pos_id, res.error().msg_only()}
+          };
         }
         args.add_argument(current_arg);
         auto post_res = pos.post_validate(std::nullopt, args);
@@ -53,11 +59,11 @@ namespace jowi::cli {
                              kv.second = args.next_raw();
                              return arg.validate(kv.second);
                            } else {
-                             return std::expected<void, parse_error>{std::unexpected{e}};
+                             return std::expected<void, parse_error>{std::unexpected{std::move(e)}};
                            }
                          })
                          .transform_error([&](auto &&e) {
-                           return std::move(e.reformat("{2:}: {0:} {1:}", k));
+                           return parse_error{e.err_type(), "{} - {}", k, e.msg_only()};
                          });
             if (!res) {
               return std::unexpected{std::move(res.error())};
@@ -73,7 +79,9 @@ namespace jowi::cli {
       for (const auto &[k, arg] : params) {
         auto res = arg.post_validate(std::cref(k), args);
         if (!res) {
-          return std::unexpected{std::move(res.error().reformat("{2:}: {0:} {1:}", k))};
+          return std::unexpected{
+            parse_error{res.error().err_type(), "{} - {}", k, res.error().msg_only()}
+          };
         }
       }
       return std::ref(args);

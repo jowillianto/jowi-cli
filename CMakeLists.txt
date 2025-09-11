@@ -77,6 +77,8 @@ if (JOWI_CLI_BUILD_BODAT)
     PUBLIC 
       jowi::cli
       jowi::crogger
+      jowi::generic
+      jowi::cli::ui
       reflectcpp
   )
 endif()

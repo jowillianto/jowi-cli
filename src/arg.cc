@@ -210,7 +210,9 @@ namespace jowi::cli {
         return std::unexpected{parse_error{parse_error_type::NO_VALUE_GIVEN, ""}};
       }
       if (!__get(value.value())) {
-        return std::unexpected{parse_error{parse_error_type::INVALID_VALUE, "{}", value.value()}};
+        return std::unexpected{
+          parse_error{parse_error_type::INVALID_VALUE, "{} is not a valid option.", value.value()}
+        };
       }
       return {};
     }

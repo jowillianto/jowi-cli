@@ -1,7 +1,6 @@
 module;
 #include <exception>
 #include <format>
-#include <string>
 #include <string_view>
 export module jowi.cli:parse_error;
 import jowi.generic;
@@ -29,25 +28,25 @@ template <class char_type> struct std::formatter<cli::parse_error_type, char_typ
   constexpr auto format(const cli::parse_error_type &v, auto &ctx) const {
     switch (v) {
       case cli::parse_error_type::INVALID_VALUE:
-        std::format_to(ctx.out(), "INVALID VALUE");
+        std::format_to(ctx.out(), "invalid value");
         break;
       case cli::parse_error_type::DUPLICATE_ARGUMENT:
-        std::format_to(ctx.out(), "DUPLICATE ARGUMENT");
+        std::format_to(ctx.out(), "duplicate argument");
         break;
       case cli::parse_error_type::NO_VALUE_GIVEN:
-        std::format_to(ctx.out(), "NO VALUE GIVEN");
+        std::format_to(ctx.out(), "no value given");
         break;
       case cli::parse_error_type::NOT_REQUIRED_ARGUMENT:
-        std::format_to(ctx.out(), "ARGUMENT NOT REQUIRED");
+        std::format_to(ctx.out(), "argument not required");
         break;
       case cli::parse_error_type::NOT_ARGUMENT_KEY:
-        std::format_to(ctx.out(), "NOT AN ARGUMENT KEY");
+        std::format_to(ctx.out(), "not an argument key");
         break;
       case cli::parse_error_type::TOO_MANY_VALUE_GIVEN:
-        std::format_to(ctx.out(), "TOO MANY VALUE GIVEN");
+        std::format_to(ctx.out(), "too many value given");
         break;
       case cli::parse_error_type::NOT_POSITIONAL:
-        std::format_to(ctx.out(), "NOT POSITIONAL");
+        std::format_to(ctx.out(), "not positional");
         break;
     };
     return ctx.out();
@@ -61,8 +60,8 @@ template <class char_type> struct std::formatter<cli::parse_error_type, char_typ
 namespace jowi::cli {
   export struct parse_error : public std::exception {
     parse_error_type __t;
-    generic::fixed_string<64> __msg;
-    std::string_view __msg_only;
+    generic::fixed_string<255> __msg;
+    size_t __type_msg_size;
 
   public:
     template <class... Args>
@@ -70,9 +69,8 @@ namespace jowi::cli {
     parse_error(parse_error_type t, std::format_string<Args...> fmt, Args &&...args) noexcept :
       __t{t}, __msg{} {
       __msg.emplace_format("{}: ", t);
-      auto msg_begin = __msg.end();
+      __type_msg_size = __msg.size();
       __msg.emplace_format(fmt, std::forward<Args>(args)...);
-      __msg_only = std::string_view{msg_begin, __msg.end()};
     }
     parse_error(parse_error_type t, std::string_view msg) noexcept : parse_error(t, "{}", msg) {}
 
@@ -80,19 +78,12 @@ namespace jowi::cli {
       return __msg.c_str();
     }
 
-    parse_error_type err_type() const noexcept {
-      return __t;
+    std::string_view msg_only() const noexcept {
+      return std::string_view{__msg.begin() + __type_msg_size, __msg.end()};
     }
 
-    template <class... Args>
-    parse_error &reformat(
-      std::format_string<parse_error_type &, std::string_view &, Args...> fmt, Args &&...args
-    ) {
-      generic::fixed_string<64> new_msg;
-      new_msg.emplace_format(fmt, __t, __msg_only, std::forward<Args>(args)...);
-      __msg_only = std::string_view{new_msg.begin(), new_msg.end()};
-      __msg = new_msg;
-      return *this;
+    parse_error_type err_type() const noexcept {
+      return __t;
     }
 
     // Shortcut Factory Functions
