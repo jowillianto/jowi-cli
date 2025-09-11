@@ -2,176 +2,114 @@ module;
 #include <chrono>
 #include <cstdlib>
 #include <expected>
-#include <filesystem>
-#include <print>
+#include <format>
+#include <iterator>
+#include <memory>
 #include <source_location>
 #include <string>
 export module jowi.crogger:logger;
-import jowi.cli.ui;
 import :log_error;
 import :log_metadata;
+import :log_filter;
+import :log_formatter;
+import :log_emitter;
 
-namespace ui = jowi::cli::ui;
-namespace fs = std::filesystem;
 namespace jowi::crogger {
 
-  /**
-   * log_formatter: A base class for polymorphic log formatters.
-   * This class provides a common interface for formatters to be composed
-   * together to generate log formatting based on the input data.
-   */
-  struct log_formatter {
-    virtual std::expected<void, log_error> check(const log_metadata &test_data) const = 0;
-    virtual void format(
-      const log_metadata &data, std::back_insert_iterator<std::string> &buf
-    ) const = 0;
-    virtual ~log_formatter() = default;
+  export template <typename T>
+  concept basic_logger = requires(const T logger, const log_metadata &data) {
+    { logger.log(data) } -> std::same_as<std::expected<void, log_error>>;
   };
 
-  struct log_filter {
-    virtual bool filter(const log_metadata &data) const = 0;
-    virtual ~log_filter() = default;
+  export template <typename T = void> struct logger;
+
+  template <> struct logger<void> {
+    virtual std::expected<void, log_error> log(const log_metadata &metadata) const = 0;
+    virtual ~logger() = default;
   };
 
-  struct log_emitter {
-    virtual std::expected<void, log_error> emit(std::string_view v) const = 0;
-    virtual ~log_emitter() = default;
+  template <basic_logger logger_type>
+  struct logger<logger_type> : private logger_type, public logger<void> {
+    using logger_type::logger_type;
+    logger(logger_type l) : logger_type{std::move(l)} {}
+
+    std::expected<void, log_error> log(const log_metadata &d) const {
+      return logger_type::log(d);
+    }
   };
 
-  struct log_formatter_chain : public log_formatter {
+  export struct log_pipeline {
   private:
-    std::vector<std::unique_ptr<log_formatter>> __fmts;
+    std::unique_ptr<log_formatter<void>> __formatter;
+    std::unique_ptr<log_filter<void>> __filter;
+    std::unique_ptr<log_emitter<void>> __emitter;
 
   public:
-    template <class... Args>
-      requires(std::derived_from<log_formatter, Args> && ...)
-    log_formatter_chain(Args &&...args) : __fmts{} {
-      add_formatters(std::forward<Args>(args)...);
-    }
+    template <basic_formatter formatter_type, basic_filter filter_type, basic_emitter emitter_type>
+    log_pipeline(formatter_type &&fmt, filter_type &&flt, emitter_type &&emt) :
+      __formatter{std::make_unique<log_formatter<std::decay_t<formatter_type>>>(
+        std::forward<formatter_type>(fmt)
+      )},
+      __filter{
+        std::make_unique<log_filter<std::decay_t<filter_type>>>(std::forward<filter_type>(flt))
+      },
+      __emitter{
+        std::make_unique<log_emitter<std::decay_t<emitter_type>>>(std::forward<emitter_type>(emt))
+      } {}
 
-    template <class... Args>
-      requires(std::derived_from<log_formatter, Args> && ...)
-    log_formatter_chain &add_formatters(Args &&...args) {
-      (__fmts.emplace_back(std::forward<Args>(args)), ...);
-      return *this;
-    }
-
-    size_t size() const noexcept {
-      return __fmts.size();
-    }
-    bool empty() const noexcept {
-      return __fmts.empty();
-    }
-    constexpr auto begin() const noexcept {
-      return __fmts.begin();
-    }
-    constexpr auto end() const noexcept {
-      return __fmts.end();
-    }
-
-    /*
-      log_formatter impl
-    */
-    std::expected<void, log_error> check(const log_metadata &test_data) const override {
-      for (const auto &fmt : __fmts) {
-        auto res = fmt->check(test_data);
-        if (!res) {
-          return std::unexpected{std::move(res.error())};
-        }
+    std::expected<void, log_error> log(const log_metadata &metadata) const {
+      if (__filter->filter(metadata)) {
+        std::string msg;
+        auto it = std::back_inserter(msg);
+        return __formatter->format(metadata, it).and_then([&]() { return __emitter->emit(msg); });
       }
       return {};
     }
-    void format(
-      const log_metadata &data, std::back_insert_iterator<std::string> &buf
-    ) const override {
-      std::ranges::for_each(__fmts, [&](const auto &fmt) { fmt->format(data, buf); });
-    }
   };
 
-  struct log_status_banner : public log_formatter {
+  export struct root_logger {
   private:
-    std::array<ui::text_format, 6> __fmts;
+    static std::unique_ptr<logger<void>> root;
 
   public:
-    log_status_banner(
-      std::array<ui::text_format, 6> fmts = {
-        ui::text_format{}.fg(ui::color::cyan()),
-        ui::text_format{}.fg(ui::color::blue()),
-        ui::text_format{}.fg(ui::color::green()),
-        ui::text_format{}.fg(ui::color::yellow()),
-        ui::text_format{}.fg(ui::color::magenta()),
-        ui::text_format{}.fg(ui::color::red())
-      }
-    ) : __fmts{std::move(fmts)} {}
-    log_status_banner &operator=(std::initializer_list<ui::text_format> l) {
-      auto max_iter = std::min(__fmts.size(), l.size());
-      for (auto i = 0; i < max_iter; i += 1) {
-        __fmts[i] = std::move(*(l.begin() + i));
-      }
-      return *this;
+    static const logger<void> &get_logger() {
+      return *root;
     }
-
-    std::expected<void, log_error> check(const log_metadata &test_data) const override {
-      return {};
-    }
-    void format(
-      const log_metadata &data, std::back_insert_iterator<std::string> &buf
-    ) const override {
-      auto fmt_id = std::max(__fmts.size(), static_cast<size_t>(data.status.level));
-      std::format_to(
-        buf,
-        "{}",
-        ui::cli_nodes{
-          ui::cli_node::format_begin(__fmts[fmt_id]),
-          ui::cli_node::text("[{}]", data.status.name),
-          ui::cli_node::format_end()
-        }
-      );
+    template <basic_logger logger_type> static void set_logger(logger_type &&l) {
+      root = std::make_unique<std::decay_t<logger_type>>(std::forward<logger_type>(l));
     }
   };
 
-  struct stdout_emitter : public log_emitter {
-  public:
-    stdout_emitter() {}
-    std::expected<void, log_error> emit(std::string_view v) const override {
-      std::println("{}", v);
-      return {};
-    }
-  };
+  std::unique_ptr<logger<void>> root_logger::root = std::make_unique<logger<log_pipeline>>(
+    formatter_tuple{
+      ' ', colorful_level_formatter{}, time_formatter{}, file_loc_formatter{}, message_formatter{}
+    },
+    no_filter{},
+    stdout_emitter{}
+  );
 
-  struct file_emitter : public log_emitter {
-  private:
-    constexpr static auto fcloser = [](FILE *f) { fclose(f); };
-    using file_ptr_type = std::unique_ptr<FILE, decltype(fcloser)>;
-    file_ptr_type __f;
-    fs::path __path;
-
-    file_emitter(file_ptr_type f, fs::path p) : __f{std::move(f)}, __path{std::move(p)} {}
-
-  public:
-    std::expected<void, log_error> emit(std::string_view v) const override {
-      auto res = fwrite(v.data(), sizeof(char), v.length(), __f.get());
-      if (res != v.length()) {
-        return std::unexpected{
-          log_error{log_error_type::io_error, "cannot write to file {}", __path.c_str()}
-        };
+  export template <basic_logger logger, class... Args>
+  std::expected<void, log_error> log(
+    const logger &l,
+    log_status status,
+    std::source_location loc,
+    std::format_string<Args...> fmt,
+    Args &&...args
+  ) {
+    return l.log(
+      log_metadata{
+        .status = std::move(status),
+        .message = std::format(fmt, std::forward<Args>(args)...),
+        .loc = loc,
+        .time = std::chrono::system_clock::now()
       }
-      return {};
-    }
+    );
+  }
 
-    const fs::path &path() const noexcept {
-      return __path;
-    }
-
-    static std::expected<file_emitter, log_error> open(const fs::path &p, bool append) {
-      FILE *f = fopen(p.c_str(), append ? "a" : "w");
-      if (f == nullptr) {
-        return std::unexpected{
-          log_error{log_error_type::io_error, "cannot open file {}", p.c_str()}
-        };
-      }
-      file_ptr_type ptr{f, fcloser};
-      return file_emitter{std::move(ptr), p};
-    }
-  };
+  export template <class... Args>
+  std::expected<void, log_error> log(
+    log_status status, std::source_location loc, std::format_string<Args...> fmt, Args &&...args
+  ) {
+    return log(root_logger::get_logger(), status, loc, fmt, std::forward<Args>(args)...);
+  }
 }

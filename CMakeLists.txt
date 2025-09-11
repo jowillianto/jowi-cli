@@ -57,7 +57,11 @@ target_sources(jowi_crogger
         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_error.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_metadata.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_status.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_filter.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_formatter.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_emitter.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/logger.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/main.cc"
 )
 target_link_libraries(jowi_crogger PUBLIC jowi::generic jowi::cli::ui)
 target_compile_features(jowi_crogger PUBLIC cxx_std_23)
