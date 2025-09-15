@@ -1,6 +1,6 @@
 module;
 #include <format>
-export module jowi.crogger:log_error;
+export module jowi.crogger:error;
 import jowi.generic;
 
 namespace jowi::crogger {
@@ -29,7 +29,7 @@ namespace jowi::crogger {
   export struct log_error : public std::exception {
   private:
     log_error_type __type;
-    generic::fixed_string<64> __msg;
+    generic::fixed_string<60> __msg;
 
   public:
     template <typename... Args>

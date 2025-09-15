@@ -1,43 +1,44 @@
 module;
 #include <concepts>
-export module jowi.crogger:log_filter;
-import :log_metadata;
+#include <memory>
+export module jowi.crogger:filter;
+import :context;
 
 namespace jowi::crogger {
   export template <typename T>
-  concept basic_filter = requires(const T filter, const log_metadata &data) {
+  concept is_filter = requires(const T filter, const context &data) {
     { filter.filter(data) } -> std::same_as<bool>;
   };
 
   // Void specialization - abstract base class
-  export template <typename T = void> struct log_filter;
+  export template <typename T = void> struct context_filter;
 
-  export template <> struct log_filter<void> {
-    virtual ~log_filter() = default;
+  export template <> struct context_filter<void> {
+    virtual ~context_filter() = default;
 
-    virtual bool filter(const log_metadata &data) const = 0;
+    virtual bool filter(const context &data) const = 0;
   };
 
   // Template for types that satisfy basic_filter
-  export template <basic_filter filter_type>
-  struct log_filter<filter_type> : private filter_type, public log_filter<void> {
+  export template <is_filter filter_type>
+  struct context_filter<filter_type> : private filter_type, public context_filter<void> {
     using filter_type::filter_type; // Inherit constructors
 
     // Move constructor
-    log_filter(filter_type &&filter) : filter_type(std::move(filter)) {}
+    context_filter(filter_type &&filter) : filter_type(std::move(filter)) {}
 
-    bool filter(const log_metadata &data) const override {
+    bool filter(const context &data) const override {
       return filter_type::filter(data);
     }
   };
 
   export enum struct filter_op { eq, lt, lte, gt, gte };
 
-  export struct level_filter {
+  export struct severity_filter {
     filter_op op;
     unsigned int level;
 
-    bool filter(const log_metadata &data) const {
+    bool filter(const context &data) const {
       unsigned int level_l = data.status.level;
       switch (op) {
         case filter_op::eq:
@@ -55,8 +56,11 @@ namespace jowi::crogger {
   };
 
   export struct no_filter {
-    bool filter(const log_metadata &data) const {
+    bool filter(const context &data) const {
       return true;
     }
   };
+
+  template struct context_filter<severity_filter>;
+  template struct context_filter<no_filter>;
 }

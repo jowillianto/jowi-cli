@@ -6,6 +6,7 @@ set (CMAKE_CXX_SCAN_FOR_MODULES true)
 
 option (JOWI_CLI_BUILD_TESTS "Build Tests" OFF)
 option (JOWI_CLI_BUILD_BODAT "Build Bodat, the C++ modules package manager. " OFF)
+option (JOWI_CLI_BENCH_CROGGER "Build the Crogger Benchmarker" OFF)
 
 if (NOT TARGET jowi::generic)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/jowi-generic)
@@ -54,13 +55,13 @@ target_sources(jowi_crogger
   PUBLIC
     FILE_SET CXX_MODULES 
       FILES   
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_error.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_metadata.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_status.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_filter.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_formatter.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_emitter.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/error.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/context.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/severity.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/filter.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/formatter.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/logger.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/emitter.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/main.cc"
 )
 target_link_libraries(jowi_crogger PUBLIC jowi::generic jowi::cli::ui)
@@ -85,10 +86,23 @@ endif()
 
 if (JOWI_CLI_BUILD_TESTS) 
   include(CTest)
-  if (NOT TARGET jowi_test_lib)
+  if (NOT TARGET jowi::test_lib)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/test-lib)
   endif()
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/tests)
+endif()
+
+if (JOWI_CLI_BENCH_CROGGER)
+  if (NOT TARGET jowi::test_lib)
+    add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/test-lib)
+  endif()
+  add_executable(crogger_benchmark ${CMAKE_CURRENT_LIST_DIR}/benchmarks/crogger.cc)
+  target_link_libraries(crogger_benchmark 
+    PRIVATE 
+      jowi::crogger
+      jowi::cli
+      jowi::test_lib
+  )
 endif()
 
 if (JOWI_INSTALL)
