@@ -95,7 +95,7 @@ namespace jowi::cli::ui {
     std::uint8_t __indent;
 
     cli_nodes &__append_node(cli_node n) {
-      if (__nodes.empty() || __nodes.back().is<valueless_node::new_line>()) {
+      if (__nodes.empty() || __nodes.back().is<valueless_node::new_line>() && __indent != 0) {
         __nodes.emplace_back(cli_node::indent(__indent));
       }
       __nodes.emplace_back(std::move(n));
