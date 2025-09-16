@@ -76,7 +76,7 @@ namespace jowi::cli::ui {
       return cli_node{std::format(fmt, std::forward<Args>(args)...)};
     }
     template <class... Args>
-    static cli_node text(std::string_view fmt, std::format_args args) noexcept {
+    static cli_node vtext(std::string_view fmt, std::format_args args) noexcept {
       return cli_node{std::vformat(fmt.data(), std::forward<std::format_args>(args))};
     }
     static cli_node format_begin(text_format fmt) {
