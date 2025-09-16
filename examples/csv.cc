@@ -1,10 +1,12 @@
-import moderna.cli;
+import jowi.cli;
+import jowi.cli.ui;
 #include <filesystem>
 #include <fstream>
 #include <print>
 #include <ranges>
 
-namespace cli = moderna::cli;
+namespace cli = jowi::cli;
+namespace ui = jowi::cli::ui;
 namespace fs = std::filesystem;
 
 int main(int argc, const char **argv) {
@@ -34,25 +36,25 @@ int main(int argc, const char **argv) {
   bool is_first_line = true;
   while (std::getline(csv_file, line, '\n')) {
     auto comma_sep = std::ranges::transform_view(std::ranges::split_view(line, ','), [](auto &&s) {
-      return cli::cli_node::text("{}", std::string_view{s.begin(), s.end()});
+      return ui::cli_node::text("{}", std::string_view{s.begin(), s.end()});
     });
     if (is_first_line && headers) {
       app.out(
         "{}",
-        cli::cli_nodes{
-          cli::cli_node::format_begin(
-            cli::text_format{}
-              .effect(cli::text_effect::bold)
-              .effect(cli::text_effect::underline)
-              .fg(cli::color::bright_blue())
+        ui::cli_nodes{
+          ui::cli_node::format_begin(
+            ui::text_format{}
+              .effect(ui::text_effect::bold)
+              .effect(ui::text_effect::underline)
+              .fg(ui::color::bright_blue())
           ),
           comma_sep,
-          cli::cli_node::format_end()
+          ui::cli_node::format_end()
         }
       );
       is_first_line = false;
     } else {
-      app.out("{}", cli::cli_nodes{comma_sep});
+      app.out("{}", ui::cli_nodes{comma_sep});
     }
   }
 }

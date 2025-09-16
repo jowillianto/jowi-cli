@@ -5,8 +5,8 @@ set (CMAKE_CXX_STANDARD_REQUIRED true)
 set (CMAKE_CXX_SCAN_FOR_MODULES true)
 
 option (JOWI_CLI_BUILD_TESTS "Build Tests" OFF)
-option (JOWI_CLI_BUILD_BODAT "Build Bodat, the C++ modules package manager. " OFF)
 option (JOWI_CLI_BENCH_CROGGER "Build the Crogger Benchmarker" OFF)
+option (JOWI_CLI_BUILD_EXAMPLES "Build Examples" OFF)
 
 if (NOT TARGET jowi::generic)
   add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/jowi-generic)
@@ -67,23 +67,6 @@ target_sources(jowi_crogger
 target_link_libraries(jowi_crogger PUBLIC jowi::generic jowi::cli::ui)
 target_compile_features(jowi_crogger PUBLIC cxx_std_23)
 
-if (JOWI_CLI_BUILD_BODAT)
-  set(REFLECTCPP_TOML ON)
-  set(REFLECTCPP_USE_STD_EXPECTED ON)
-  add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/reflect-cpp)
-  add_executable(bodat ${CMAKE_CURRENT_LIST_DIR}/bodat/main.cc)
-  target_include_directories(bodat PRIVATE ${CMAKE_CURRENT_LIST_DIR}/bodat)
-  target_compile_definitions(bodat PRIVATE REFLECTCPP_USE_STD_EXPECTED)
-  target_link_libraries(bodat 
-    PUBLIC 
-      jowi::cli
-      jowi::crogger
-      jowi::generic
-      jowi::cli::ui
-      reflectcpp
-  )
-endif()
-
 if (JOWI_CLI_BUILD_TESTS) 
   include(CTest)
   if (NOT TARGET jowi::test_lib)
@@ -134,14 +117,16 @@ if (JOWI_INSTALL)
   endif()
 endif()
 
-add_executable("${PROJECT_NAME}_example_echo" EXCLUDE_FROM_ALL "${CMAKE_CURRENT_LIST_DIR}/examples/echo.cc")
-target_link_libraries(${PROJECT_NAME}_example_echo PUBLIC jowi::cli)
+if (JOWI_CLI_BUILD_EXAMPLES)
+  add_executable("${PROJECT_NAME}_example_echo" "${CMAKE_CURRENT_LIST_DIR}/examples/echo.cc")
+  target_link_libraries(${PROJECT_NAME}_example_echo PUBLIC jowi::cli)
 
-add_executable("${PROJECT_NAME}_example_actions" EXCLUDE_FROM_ALL "${CMAKE_CURRENT_LIST_DIR}/examples/actions.cc")
-target_link_libraries(${PROJECT_NAME}_example_actions PUBLIC jowi::cli)
+  add_executable("${PROJECT_NAME}_example_actions" "${CMAKE_CURRENT_LIST_DIR}/examples/actions.cc")
+  target_link_libraries(${PROJECT_NAME}_example_actions PUBLIC jowi::cli)
 
-add_executable("${PROJECT_NAME}_example_ui" EXCLUDE_FROM_ALL "${CMAKE_CURRENT_LIST_DIR}/examples/ui.cc")
-target_link_libraries(${PROJECT_NAME}_example_ui PUBLIC jowi::cli)
+  add_executable("${PROJECT_NAME}_example_ui" "${CMAKE_CURRENT_LIST_DIR}/examples/ui.cc")
+  target_link_libraries(${PROJECT_NAME}_example_ui PUBLIC jowi::cli jowi::cli::ui)
 
-add_executable("${PROJECT_NAME}_example_csv" EXCLUDE_FROM_ALL "${CMAKE_CURRENT_LIST_DIR}/examples/csv.cc")
-target_link_libraries(${PROJECT_NAME}_example_csv PUBLIC jowi::cli)
+  add_executable("${PROJECT_NAME}_example_csv" "${CMAKE_CURRENT_LIST_DIR}/examples/csv.cc")
+  target_link_libraries(${PROJECT_NAME}_example_csv PUBLIC jowi::cli jowi::cli::ui)
+endif()

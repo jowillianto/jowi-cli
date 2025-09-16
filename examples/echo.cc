@@ -1,7 +1,7 @@
 #include <format>
-import moderna.cli;
+import jowi.cli;
 
-namespace cli = moderna::cli;
+namespace cli = jowi::cli;
 
 int main(int argc, const char **argv) {
   auto app = cli::app{
