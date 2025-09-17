@@ -31,7 +31,26 @@ namespace jowi::crogger {
       );
     }
   };
-  using msg = message;
+
+  /*
+    this should mirror message.
+  */
+  export template <typename... Args> struct msg : public raw_message {
+  private:
+    std::string_view __fmt;
+    std::tuple<Args...> __args;
+
+  public:
+    msg(std::format_string<Args...> fmt, Args... arguments) :
+      __fmt(fmt.get()), __args(std::forward<Args>(arguments)...) {}
+
+    void format(std::back_insert_iterator<stream_emitter<void>> &it) const override {
+      std::apply(
+        [&](const auto &...args) { std::vformat_to(it, __fmt, std::make_format_args(args...)); },
+        __args
+      );
+    }
+  };
 
   /*
     context
