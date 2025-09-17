@@ -170,7 +170,7 @@ namespace jowi::cli {
     constexpr auto end() const noexcept {
       return __options.end();
     }
-    size_t size() const noexcept {
+    uint64_t size() const noexcept {
       return __options.size();
     }
     bool empty() const noexcept {
@@ -219,26 +219,26 @@ namespace jowi::cli {
   };
 
   export struct arg_count_validator {
-    size_t min_size;
-    size_t max_size;
+    uint64_t min_size;
+    uint64_t max_size;
 
-    arg_count_validator(size_t min_size, size_t max_size) :
+    arg_count_validator(uint64_t min_size, uint64_t max_size) :
       min_size{min_size}, max_size{max_size} {}
 
     /*
       Factory Functions
     */
-    static arg_count_validator range(size_t min_size, size_t max_size) {
+    static arg_count_validator range(uint64_t min_size, uint64_t max_size) {
       return arg_count_validator{min_size, max_size};
     }
 
-    static arg_count_validator at_least(size_t min_size) {
-      return arg_count_validator::range(min_size, static_cast<size_t>(-1));
+    static arg_count_validator at_least(uint64_t min_size) {
+      return arg_count_validator::range(min_size, static_cast<uint64_t>(-1));
     }
-    static arg_count_validator at_most(size_t max_size) {
+    static arg_count_validator at_most(uint64_t max_size) {
       return arg_count_validator::range(0, max_size);
     }
-    static arg_count_validator equal_to(size_t v) {
+    static arg_count_validator equal_to(uint64_t v) {
       return arg_count_validator::range(v, v);
     }
     static arg_count_validator one() {
@@ -273,7 +273,8 @@ namespace jowi::cli {
     std::expected<void, parse_error> post_validate(
       std::optional<std::reference_wrapper<const arg_key>> key, parsed_arg &args
     ) const {
-      size_t arg_count = key.transform([&](const arg_key &k) { return args.count(k); }).value_or(1);
+      uint64_t arg_count =
+        key.transform([&](const arg_key &k) { return args.count(k); }).value_or(1);
       if (arg_count > max_size || arg_count < min_size) {
         return std::unexpected{parse_error{
           parse_error_type::TOO_MANY_VALUE_GIVEN,
@@ -354,16 +355,16 @@ namespace jowi::cli {
       return *this;
     }
     // shortcut build functions
-    arg &n_at_least(size_t min_size) {
+    arg &n_at_least(uint64_t min_size) {
       return add_validator(arg_count_validator::at_least(min_size));
     }
-    arg &n_at_most(size_t max_size) {
+    arg &n_at_most(uint64_t max_size) {
       return add_validator(arg_count_validator::at_most(max_size));
     }
-    arg &n_equal_to(size_t v) {
+    arg &n_equal_to(uint64_t v) {
       return add_validator(arg_count_validator::equal_to(v));
     }
-    arg &n_range(size_t min_size, size_t max_size) {
+    arg &n_range(uint64_t min_size, uint64_t max_size) {
       return add_validator(arg_count_validator::range(min_size, max_size));
     }
     arg &require_value() {
@@ -380,7 +381,7 @@ namespace jowi::cli {
     }
 
     // Validator Attributes
-    size_t size() const noexcept {
+    uint64_t size() const noexcept {
       return __vtors.size();
     }
     bool empty() const noexcept {

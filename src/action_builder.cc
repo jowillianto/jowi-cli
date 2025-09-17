@@ -21,7 +21,7 @@ namespace jowi::cli {
     std::reference_wrapper<app> __app;
     std::reference_wrapper<arg> __arg;
     bool __arg_updated;
-    size_t __id;
+    uint64_t __id;
 
   public:
     action_builder(app &app_, std::optional<std::string> help_text) :

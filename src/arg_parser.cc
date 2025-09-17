@@ -22,7 +22,7 @@ namespace jowi::cli {
     arg_decl(arg pos) : pos{std::move(pos)}, params{} {}
 
     std::expected<ref<parsed_arg>, parse_error> parse(
-      size_t pos_id, parsed_arg &args, bool parse_positional
+      uint64_t pos_id, parsed_arg &args, bool parse_positional
     ) const {
       auto opt_current_arg = args.raw();
       if (parse_positional && opt_current_arg.has_value()) {
@@ -87,7 +87,7 @@ namespace jowi::cli {
       return std::ref(args);
     }
 
-    size_t param_size() const noexcept {
+    uint64_t param_size() const noexcept {
       return params.size();
     }
 

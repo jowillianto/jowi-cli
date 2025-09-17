@@ -61,7 +61,7 @@ namespace jowi::cli {
   export struct parse_error : public std::exception {
     parse_error_type __t;
     generic::fixed_string<255> __msg;
-    size_t __type_msg_size;
+    uint64_t __type_msg_size;
 
   public:
     template <class... Args>

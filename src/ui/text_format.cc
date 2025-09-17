@@ -53,7 +53,7 @@ namespace jowi::cli::ui {
     bool has_effect(text_effect e) const {
       return __effects.contains(e);
     }
-    std::size_t effects_size() const {
+    std::uint64_t effects_size() const {
       return __effects.size();
     }
     constexpr auto effects_begin() const {

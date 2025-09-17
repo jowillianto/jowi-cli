@@ -2,34 +2,28 @@ module;
 #include <algorithm>
 #include <expected>
 #include <format>
-#include <optional>
 #include <string_view>
 export module jowi.cli:app_version;
 import :arg_shortcut;
 import :parse_error;
 namespace jowi::cli {
   export struct app_version {
-    size_t major;
-    size_t minor;
-    size_t patch;
+    uint64_t major;
+    uint64_t minor;
+    uint64_t patch;
 
+    constexpr friend std::strong_ordering operator<=>(const app_version &l, const app_version &r) =
+      default;
     constexpr friend bool operator==(const app_version &l, const app_version &r) {
       return l.major == r.major && l.minor == r.minor && l.patch == r.patch;
     }
+
     constexpr friend bool operator<(const app_version &l, const app_version &r) {
       if (l.major < r.major) return true;
       else if (l.major == r.major && l.minor < r.minor)
         return true;
       else if (l.major == r.major && l.minor == r.minor)
         return l.patch < r.patch;
-      return false;
-    }
-    constexpr friend bool operator>(const app_version &l, const app_version &r) {
-      if (l.major > r.major) return true;
-      else if (l.major == r.major && l.minor > r.minor)
-        return true;
-      else if (l.major == r.major && l.minor == r.minor)
-        return l.patch > r.patch;
       return false;
     }
 
@@ -56,7 +50,9 @@ namespace jowi::cli {
               };
             } else {
               return std::expected<app_version, parse_error>{app_version{
-                static_cast<size_t>(major), static_cast<size_t>(minor), static_cast<size_t>(patch)
+                static_cast<uint64_t>(major),
+                static_cast<uint64_t>(minor),
+                static_cast<uint64_t>(patch)
               }};
             }
           });

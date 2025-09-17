@@ -144,7 +144,7 @@ namespace jowi::cli::ui {
     }
 
     // Access
-    size_t size() const noexcept {
+    uint64_t size() const noexcept {
       return __nodes.size();
     }
     bool empty() const noexcept {

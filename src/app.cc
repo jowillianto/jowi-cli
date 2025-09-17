@@ -80,9 +80,9 @@ namespace jowi::cli {
         args().size() == 0 ? ui::cli_nodes{} : ui::cli_nodes{ui::cli_node::new_line()},
         ui::cli_node::format_begin(help_fmt)
       );
-      size_t start_id = std::max(0, static_cast<int>(args().size()) - 1);
+      uint64_t start_id = std::max(0, static_cast<int>(args().size()) - 1);
       for (auto arg = __parser.begin() + start_id; arg != __parser.end(); arg += 1) {
-        size_t cur_arg_id = std::distance(__parser.begin(), arg);
+        uint64_t cur_arg_id = std::distance(__parser.begin(), arg);
         bool print_cur_pos = cur_arg_id > start_id;
         auto sub_nodes = ui::cli_nodes{
           print_cur_pos ? static_cast<std::uint8_t>(2) : static_cast<std::uint8_t>(0)

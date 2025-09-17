@@ -60,7 +60,7 @@ namespace jowi::cli {
       return __env.end();
     }
 
-    size_t size() const {
+    uint64_t size() const {
       return __env.size();
     }
 

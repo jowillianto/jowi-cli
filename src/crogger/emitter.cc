@@ -92,14 +92,14 @@ namespace jowi::crogger {
   private:
     std::unique_ptr<emitter<void>> __emt;
     std::string __buf;
-    size_t __cur;
+    uint64_t __cur;
 
   public:
-    ss_emitter(size_t buf_size, is_emitter auto &&emt) :
+    ss_emitter(uint64_t buf_size, is_emitter auto &&emt) :
       __emt{emitter<>::make_unique<std::decay_t<decltype(emt)>>(std::forward<decltype(emt)>(emt))},
       __buf{}, __cur{0} {
       __buf.reserve(buf_size);
-      for (size_t i = 0; i < buf_size; i += 1)
+      for (uint64_t i = 0; i < buf_size; i += 1)
         __buf.push_back('\0');
     }
     ss_emitter(is_emitter auto &&emt) : ss_emitter(120, std::forward<decltype(emt)>(emt)) {}

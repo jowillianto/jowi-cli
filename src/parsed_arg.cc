@@ -51,7 +51,7 @@ namespace jowi::cli {
     auto param_size() const noexcept {
       return __values.size();
     }
-    size_t size() const noexcept {
+    uint64_t size() const noexcept {
       return __values.size();
     }
     bool empty() const noexcept {
@@ -80,7 +80,7 @@ namespace jowi::cli {
         &param_pair::second
       };
     }
-    constexpr size_t count(const generic::is_comparable<arg_key> auto &key) const noexcept {
+    constexpr uint64_t count(const generic::is_comparable<arg_key> auto &key) const noexcept {
       return std::ranges::count_if(param_beg(), param_end(), [&](const auto &p) {
         return p.first == key;
       });
