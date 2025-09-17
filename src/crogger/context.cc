@@ -31,6 +31,7 @@ namespace jowi::crogger {
       );
     }
   };
+  using msg = message;
 
   /*
     context
