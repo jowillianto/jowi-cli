@@ -23,8 +23,8 @@ namespace jowi::cli {
 
   template <class T>
   concept help_providing_arg_validator =
-    requires(const std::decay_t<T> t, ui::cli_nodes &a, ui::cli_nodes &b) {
-      { t.help(a, b) } -> std::same_as<void>;
+    requires(const std::decay_t<T> t, ui::cli_nodes &a) {
+      { t.help(a) } -> std::same_as<ui::cli_nodes&>;
     };
 
   template <class T>
