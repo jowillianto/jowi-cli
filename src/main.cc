@@ -8,3 +8,4 @@ export import :app;
 export import :app_identity;
 export import :action_builder;
 export import :arg_shortcut;
+export import :parse_error;
