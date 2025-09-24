@@ -16,24 +16,23 @@ import :parsed_arg;
 import :arg_key;
 
 namespace jowi::cli {
-  template <class T>
+  export template <class T>
   concept unique_arg_validator = requires(const std::decay_t<T> t) {
     { t.id() } -> std::same_as<std::optional<std::string>>;
   };
 
-  template <class T>
-  concept help_providing_arg_validator =
-    requires(const std::decay_t<T> t, ui::cli_nodes &a) {
-      { t.help(a) } -> std::same_as<ui::cli_nodes&>;
-    };
+  export template <class T>
+  concept help_providing_arg_validator = requires(const std::decay_t<T> t, ui::cli_nodes &a) {
+    { t.help(a) } -> std::same_as<ui::cli_nodes &>;
+  };
 
-  template <class T>
+  export template <class T>
   concept value_arg_validator =
     requires(const std::decay_t<T> t, std::optional<std::string_view> sv) {
       { t.validate(sv) } -> std::same_as<std::expected<void, parse_error>>;
     };
 
-  template <class T>
+  export template <class T>
   concept post_validate_arg_validator = requires(
     const std::decay_t<T> t,
     std::optional<std::reference_wrapper<const arg_key>> key,
@@ -42,7 +41,7 @@ namespace jowi::cli {
     { t.post_validate(key, pa) } -> std::same_as<std::expected<void, parse_error>>;
   };
 
-  template <class validator_type>
+  export template <class validator_type>
   concept is_arg_validator =
     unique_arg_validator<validator_type> || help_providing_arg_validator<validator_type> ||
     value_arg_validator<validator_type> || post_validate_arg_validator<validator_type>;
