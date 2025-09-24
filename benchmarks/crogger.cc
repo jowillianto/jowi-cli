@@ -88,7 +88,7 @@ int main(int argc, const char **argv) {
   auto emitter =
     app.args().first_of("--emit").transform(cli::parse_arg<std::string>).value_or("stdout");
   auto rnd_msg = test_lib::random_string(log_msg_length);
-  crogger::warn({"Begin: Logger Init"});
+  crogger::warn(crogger::message{"Begin: Logger Init"});
   auto [logger, logger_init_time] = invoke_bench(create_logger, formatter, emitter);
   crogger::warn(crogger::message{"End: Logger Init ({})", logger_init_time});
   crogger::warn(crogger::message{"Begin: Log Message"});
