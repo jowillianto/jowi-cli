@@ -14,10 +14,11 @@ endif()
 
 add_library(jowi_cli_ui)
 add_library(jowi::cli::ui ALIAS jowi_cli_ui)
+add_library(jowi::cli_ui ALIAS jowi_cli_ui)
 target_sources(jowi_cli_ui
   PUBLIC
-    FILE_SET CXX_MODULES 
-      FILES   
+    FILE_SET CXX_MODULES
+      FILES
         "${CMAKE_CURRENT_LIST_DIR}/src/ui/color.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/ui/main.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/ui/node.cc"
@@ -30,8 +31,8 @@ add_library(${PROJECT_NAME})
 add_library(jowi::cli ALIAS ${PROJECT_NAME})
 target_sources(${PROJECT_NAME}
   PUBLIC
-    FILE_SET CXX_MODULES 
-      FILES 
+    FILE_SET CXX_MODULES
+      FILES
         "${CMAKE_CURRENT_LIST_DIR}/src/action_builder.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/app_identity.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/app_version.cc"
@@ -53,8 +54,8 @@ add_library(jowi_crogger)
 add_library(jowi::crogger ALIAS jowi_crogger)
 target_sources(jowi_crogger
   PUBLIC
-    FILE_SET CXX_MODULES 
-      FILES   
+    FILE_SET CXX_MODULES
+      FILES
         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/error.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/context.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/severity.cc"
@@ -67,7 +68,7 @@ target_sources(jowi_crogger
 target_link_libraries(jowi_crogger PUBLIC jowi::generic jowi::cli::ui)
 target_compile_features(jowi_crogger PUBLIC cxx_std_23)
 
-if (JOWI_CLI_BUILD_TESTS) 
+if (JOWI_CLI_BUILD_TESTS)
   include(CTest)
   if (NOT TARGET jowi::test_lib)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/test-lib)
@@ -80,8 +81,8 @@ if (JOWI_CLI_BENCH_CROGGER)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/test-lib)
   endif()
   add_executable(crogger_benchmark ${CMAKE_CURRENT_LIST_DIR}/benchmarks/crogger.cc)
-  target_link_libraries(crogger_benchmark 
-    PRIVATE 
+  target_link_libraries(crogger_benchmark
+    PRIVATE
       jowi::crogger
       jowi::cli
       jowi::test_lib
@@ -92,17 +93,17 @@ if (JOWI_INSTALL)
   include(GNUInstallDirs)
   set (JOWI_COMPONENT_NAME "cli")
   set_property(
-    TARGET ${PROJECT_NAME} 
+    TARGET ${PROJECT_NAME}
     PROPERTY EXPORT_NAME ${JOWI_COMPONENT_NAME}
   )
   install (
     TARGETS ${PROJECT_NAME}
     EXPORT jowi
-    FILE_SET 
-      CXX_MODULES 
+    FILE_SET
+      CXX_MODULES
       DESTINATION ${CMAKE_INSTALL_PREFIX}/cxx_modules/jowi/${JOWI_COMPONENT_NAME}
       COMPONENT ${JOWI_COMPONENT_NAME}_file_set
-    CXX_MODULES_BMI 
+    CXX_MODULES_BMI
       COMPONENT ${JOWI_COMPONENT_NAME}
       DESTINATION ${CMAKE_INSTALL_PREFIX}/cxx_modules/jowi/${JOWI_COMPONENT_NAME}
   )
