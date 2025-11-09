@@ -60,7 +60,7 @@ template <class CharType> struct std::formatter<cli::ParseErrorType, CharType> {
 namespace jowi::cli {
   export struct ParseError : public std::exception {
     ParseErrorType __t;
-    generic::fixed_string<255> __msg;
+    generic::FixedString<255> __msg;
     uint64_t __type_msg_size;
 
   public:

@@ -17,7 +17,7 @@ namespace jowi::cli {
 
   struct ArgDecl {
     Arg pos;
-    generic::key_vector<ArgKey, Arg> params;
+    generic::KeyVector<ArgKey, Arg> params;
 
     ArgDecl(Arg pos) : pos{std::move(pos)}, params{} {}
 

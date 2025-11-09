@@ -53,7 +53,7 @@ namespace jowi::cli {
       Comparison Operator Overload
     */
     template <class T>
-      requires(!std::same_as<ArgKey, T> && generic::is_comparable<std::string, T>)
+      requires(!std::same_as<ArgKey, T> && generic::IsComparable<std::string, T>)
     friend constexpr bool operator==(const ArgKey &l, const T &r) {
       return l.__value == r;
     }

@@ -5,7 +5,7 @@ import jowi.generic;
 
 namespace jowi::crogger {
   export struct Severity {
-    generic::fixed_string<10> name;
+    generic::FixedString<10> name;
     unsigned int level;
 
     static Severity trace() noexcept {

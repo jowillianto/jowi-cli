@@ -29,7 +29,7 @@ namespace jowi::crogger {
   export struct LogError : public std::exception {
   private:
     LogErrorType __type;
-    generic::fixed_string<60> __msg;
+    generic::FixedString<60> __msg;
 
   public:
     template <typename... Args>

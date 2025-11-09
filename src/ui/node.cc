@@ -23,7 +23,7 @@ namespace jowi::tui {
 
   export struct CliNode {
   private:
-    using VariantType = generic::variant<ValuelessNode, TextFormat, std::string, IndentNode>;
+    using VariantType = generic::Variant<ValuelessNode, TextFormat, std::string, IndentNode>;
     VariantType __value;
 
     template <typename... Args>

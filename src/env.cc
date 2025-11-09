@@ -13,7 +13,7 @@ import :parse_error;
 namespace jowi::cli {
   struct AppEnv {
   private:
-    generic::key_vector<std::string, std::string> __env;
+    generic::KeyVector<std::string, std::string> __env;
 
   public:
     AppEnv() {}
@@ -22,7 +22,7 @@ namespace jowi::cli {
       get_env.
       Gets a key from the current environment.
     */
-    template <generic::is_comparable<std::string> Key>
+    template <generic::IsComparable<std::string> Key>
     std::optional<std::string_view> get_env(Key &&key) const noexcept {
       return __env.get(std::forward<Key>(key));
     }

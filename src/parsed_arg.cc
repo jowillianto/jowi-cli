@@ -60,7 +60,7 @@ namespace jowi::cli {
 
     // Query Functions
     constexpr std::optional<std::string_view> first_of(
-      const generic::is_comparable<ArgKey> auto &key
+      const generic::IsComparable<ArgKey> auto &key
     ) const noexcept {
       auto it = std::ranges::find_if(param_beg(), param_end(), [&](const auto &p) {
         return p.first == key;
@@ -68,10 +68,10 @@ namespace jowi::cli {
       if (it == param_end()) return std::nullopt;
       return it->second;
     }
-    constexpr bool contains(const generic::is_comparable<ArgKey> auto &key) const noexcept {
+    constexpr bool contains(const generic::IsComparable<ArgKey> auto &key) const noexcept {
       return first_of(key).has_value();
     }
-    constexpr auto filter(generic::is_comparable<ArgKey> auto key) const noexcept {
+    constexpr auto filter(generic::IsComparable<ArgKey> auto key) const noexcept {
       return std::ranges::transform_view{
         std::ranges::filter_view{
           std::ranges::subrange{param_beg(), param_end()},
@@ -80,7 +80,7 @@ namespace jowi::cli {
         &ParamPair::second
       };
     }
-    constexpr uint64_t count(const generic::is_comparable<ArgKey> auto &key) const noexcept {
+    constexpr uint64_t count(const generic::IsComparable<ArgKey> auto &key) const noexcept {
       return std::ranges::count_if(param_beg(), param_end(), [&](const auto &p) {
         return p.first == key;
       });

@@ -17,7 +17,7 @@ namespace jowi::cli {
   };
   export struct ActionBuilder {
   private:
-    generic::key_vector<std::string, AppAction> __actions;
+    generic::KeyVector<std::string, AppAction> __actions;
     std::reference_wrapper<App> __app;
     std::reference_wrapper<Arg> __arg;
     bool __arg_updated;

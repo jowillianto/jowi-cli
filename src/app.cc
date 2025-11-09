@@ -141,11 +141,11 @@ namespace jowi::cli {
     }
     template <
       class T,
-      std::convertible_to<generic::error_formatter> E,
-      std::invocable<generic::error_formatter> F>
+      std::convertible_to<generic::ErrorFormatter> E,
+      std::invocable<generic::ErrorFormatter> F>
     T expect_or(std::expected<T, E> &&res, F &&f) const {
       if (!res) {
-        std::invoke(f, generic::error_formatter{res.error()});
+        std::invoke(f, generic::ErrorFormatter{res.error()});
         std::exit(1);
       } else {
         if constexpr (!std::same_as<T, void>) {
@@ -154,14 +154,14 @@ namespace jowi::cli {
       }
     }
 
-    template <class T, std::convertible_to<generic::error_formatter> E, class... Args>
+    template <class T, std::convertible_to<generic::ErrorFormatter> E, class... Args>
       requires(std::formattable<Args, char> && ...)
     T expect(
       std::expected<T, E> &&res,
-      std::format_string<generic::error_formatter &, Args...> fmt,
+      std::format_string<generic::ErrorFormatter &, Args...> fmt,
       Args &&...args
     ) const {
-      return expect_or(std::forward<std::expected<T, E> &&>(res), [&](generic::error_formatter e) {
+      return expect_or(std::forward<std::expected<T, E> &&>(res), [&](generic::ErrorFormatter e) {
         error(
           1,
           "{}",
