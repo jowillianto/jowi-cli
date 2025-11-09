@@ -6,7 +6,7 @@ export module jowi.cli:parse_error;
 import jowi.generic;
 
 namespace jowi::cli {
-  export enum struct parse_error_type {
+  export enum struct ParseErrorType {
     INVALID_VALUE,
     DUPLICATE_ARGUMENT,
     NO_VALUE_GIVEN,
@@ -18,34 +18,34 @@ namespace jowi::cli {
 }
 
 /*
-  Formatter implementation for parse_error_type
+  Formatter implementation for ParseErrorType
 */
 namespace cli = jowi::cli;
-template <class char_type> struct std::formatter<cli::parse_error_type, char_type> {
+template <class CharType> struct std::formatter<cli::ParseErrorType, CharType> {
   constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
-  constexpr auto format(const cli::parse_error_type &v, auto &ctx) const {
+  constexpr auto format(const cli::ParseErrorType &v, auto &ctx) const {
     switch (v) {
-      case cli::parse_error_type::INVALID_VALUE:
+      case cli::ParseErrorType::INVALID_VALUE:
         std::format_to(ctx.out(), "invalid value");
         break;
-      case cli::parse_error_type::DUPLICATE_ARGUMENT:
+      case cli::ParseErrorType::DUPLICATE_ARGUMENT:
         std::format_to(ctx.out(), "duplicate argument");
         break;
-      case cli::parse_error_type::NO_VALUE_GIVEN:
+      case cli::ParseErrorType::NO_VALUE_GIVEN:
         std::format_to(ctx.out(), "no value given");
         break;
-      case cli::parse_error_type::NOT_REQUIRED_ARGUMENT:
+      case cli::ParseErrorType::NOT_REQUIRED_ARGUMENT:
         std::format_to(ctx.out(), "argument not required");
         break;
-      case cli::parse_error_type::NOT_ARGUMENT_KEY:
+      case cli::ParseErrorType::NOT_ARGUMENT_KEY:
         std::format_to(ctx.out(), "not an argument key");
         break;
-      case cli::parse_error_type::TOO_MANY_VALUE_GIVEN:
+      case cli::ParseErrorType::TOO_MANY_VALUE_GIVEN:
         std::format_to(ctx.out(), "too many value given");
         break;
-      case cli::parse_error_type::NOT_POSITIONAL:
+      case cli::ParseErrorType::NOT_POSITIONAL:
         std::format_to(ctx.out(), "not positional");
         break;
     };
@@ -54,25 +54,25 @@ template <class char_type> struct std::formatter<cli::parse_error_type, char_typ
 };
 
 /*
-  parse_error
+  ParseError
   wraps error and gives it an error type. F
 */
 namespace jowi::cli {
-  export struct parse_error : public std::exception {
-    parse_error_type __t;
+  export struct ParseError : public std::exception {
+    ParseErrorType __t;
     generic::fixed_string<255> __msg;
     uint64_t __type_msg_size;
 
   public:
     template <class... Args>
       requires(std::formattable<Args, char> && ...)
-    parse_error(parse_error_type t, std::format_string<Args...> fmt, Args &&...args) noexcept :
+    ParseError(ParseErrorType t, std::format_string<Args...> fmt, Args &&...args) noexcept :
       __t{t}, __msg{} {
       __msg.emplace_format("{}: ", t);
       __type_msg_size = __msg.size();
       __msg.emplace_format(fmt, std::forward<Args>(args)...);
     }
-    parse_error(parse_error_type t, std::string_view msg) noexcept : parse_error(t, "{}", msg) {}
+    ParseError(ParseErrorType t, std::string_view msg) noexcept : ParseError(t, "{}", msg) {}
 
     const char *what() const noexcept {
       return __msg.c_str();
@@ -82,51 +82,51 @@ namespace jowi::cli {
       return std::string_view{__msg.begin() + __type_msg_size, __msg.end()};
     }
 
-    parse_error_type err_type() const noexcept {
+    ParseErrorType err_type() const noexcept {
       return __t;
     }
 
     // Shortcut Factory Functions
     template <class... Args>
       requires(std::formattable<Args, char> && ...)
-    static parse_error invalid_value(std::format_string<Args...> fmt, Args &&...args) {
-      return parse_error(parse_error_type::INVALID_VALUE, fmt, std::forward<Args>(args)...);
+    static ParseError invalid_value(std::format_string<Args...> fmt, Args &&...args) {
+      return ParseError(ParseErrorType::INVALID_VALUE, fmt, std::forward<Args>(args)...);
     }
 
     template <class... Args>
       requires(std::formattable<Args, char> && ...)
-    static parse_error duplicate_argument(std::format_string<Args...> fmt, Args &&...args) {
-      return parse_error(parse_error_type::DUPLICATE_ARGUMENT, fmt, std::forward<Args>(args)...);
+    static ParseError duplicate_argument(std::format_string<Args...> fmt, Args &&...args) {
+      return ParseError(ParseErrorType::DUPLICATE_ARGUMENT, fmt, std::forward<Args>(args)...);
     }
 
     template <class... Args>
       requires(std::formattable<Args, char> && ...)
-    static parse_error no_value_given(std::format_string<Args...> fmt, Args &&...args) {
-      return parse_error(parse_error_type::NO_VALUE_GIVEN, fmt, std::forward<Args>(args)...);
+    static ParseError no_value_given(std::format_string<Args...> fmt, Args &&...args) {
+      return ParseError(ParseErrorType::NO_VALUE_GIVEN, fmt, std::forward<Args>(args)...);
     }
 
     template <class... Args>
       requires(std::formattable<Args, char> && ...)
-    static parse_error not_required_argument(std::format_string<Args...> fmt, Args &&...args) {
-      return parse_error(parse_error_type::NOT_REQUIRED_ARGUMENT, fmt, std::forward<Args>(args)...);
+    static ParseError not_required_argument(std::format_string<Args...> fmt, Args &&...args) {
+      return ParseError(ParseErrorType::NOT_REQUIRED_ARGUMENT, fmt, std::forward<Args>(args)...);
     }
 
     template <class... Args>
       requires(std::formattable<Args, char> && ...)
-    static parse_error not_argument_key(std::format_string<Args...> fmt, Args &&...args) {
-      return parse_error(parse_error_type::NOT_ARGUMENT_KEY, fmt, std::forward<Args>(args)...);
+    static ParseError not_argument_key(std::format_string<Args...> fmt, Args &&...args) {
+      return ParseError(ParseErrorType::NOT_ARGUMENT_KEY, fmt, std::forward<Args>(args)...);
     }
 
     template <class... Args>
       requires(std::formattable<Args, char> && ...)
-    static parse_error too_many_value_given(std::format_string<Args...> fmt, Args &&...args) {
-      return parse_error(parse_error_type::TOO_MANY_VALUE_GIVEN, fmt, std::forward<Args>(args)...);
+    static ParseError too_many_value_given(std::format_string<Args...> fmt, Args &&...args) {
+      return ParseError(ParseErrorType::TOO_MANY_VALUE_GIVEN, fmt, std::forward<Args>(args)...);
     }
 
     template <class... Args>
       requires(std::formattable<Args, char> && ...)
-    static parse_error not_positional(std::format_string<Args...> fmt, Args &&...args) {
-      return parse_error(parse_error_type::NOT_POSITIONAL, fmt, std::forward<Args>(args)...);
+    static ParseError not_positional(std::format_string<Args...> fmt, Args &&...args) {
+      return ParseError(ParseErrorType::NOT_POSITIONAL, fmt, std::forward<Args>(args)...);
     }
   };
 }

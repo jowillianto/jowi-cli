@@ -4,80 +4,80 @@ module;
 #include <format>
 #include <iterator>
 export module jowi.crogger:formatter;
-import jowi.cli.ui;
+import jowi.tui;
 import :error;
 import :context;
 import :emitter;
 
-namespace ui = jowi::cli::ui;
+namespace tui = jowi::tui;
 namespace jowi::crogger {
   export template <class T>
   concept is_formatter = requires(
-    const T formatter, const context &ctx, std::back_insert_iterator<stream_emitter<void>> &it
+    const T Formatter, const Context &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
   ) {
-    { formatter.format(ctx, it) } -> std::same_as<std::expected<void, log_error>>;
+    { Formatter.format(ctx, it) } -> std::same_as<std::expected<void, LogError>>;
   };
 
   export template <typename T>
-  concept format_checkable = requires(const T formatter, const context &ctx) {
-    { formatter.check(ctx) } -> std::same_as<std::expected<void, log_error>>;
+  concept format_checkable = requires(const T Formatter, const Context &ctx) {
+    { Formatter.check(ctx) } -> std::same_as<std::expected<void, LogError>>;
   };
 
-  export template <class T = void> struct formatter;
+  export template <class T = void> struct Formatter;
 
-  export template <> struct formatter<void> {
-    virtual ~formatter() = default;
+  export template <> struct Formatter<void> {
+    virtual ~Formatter() = default;
 
-    virtual std::expected<void, log_error> check(const context &) const = 0;
-    virtual std::expected<void, log_error> format(
-      const context &, std::back_insert_iterator<stream_emitter<void>> &
+    virtual std::expected<void, LogError> check(const Context &) const = 0;
+    virtual std::expected<void, LogError> format(
+      const Context &, std::back_insert_iterator<StreamEmitter<void>> &
     ) const = 0;
   };
-  export template <is_formatter formatter_type>
-  struct formatter<formatter_type> : private formatter_type, public formatter<void> {
-    using formatter_type::formatter_type; // Inherit constructors
+  export template <is_formatter FormatterType>
+  struct Formatter<FormatterType> : private FormatterType, public Formatter<void> {
+    using FormatterType::FormatterType; // Inherit constructors
 
     // Move constructor
-    formatter(formatter_type &&formatter) : formatter_type(std::move(formatter)) {}
+    Formatter(FormatterType &&Formatter) : FormatterType(std::move(Formatter)) {}
 
-    std::expected<void, log_error> format(
-      const context &ctx, std::back_insert_iterator<stream_emitter<void>> &it
+    std::expected<void, LogError> format(
+      const Context &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
     ) const override {
-      return formatter_type::format(ctx, it);
+      return FormatterType::format(ctx, it);
     }
 
-    std::expected<void, log_error> check(const context &ctx) const override {
-      if constexpr (format_checkable<formatter_type>) {
-        return formatter_type::check(ctx);
+    std::expected<void, LogError> check(const Context &ctx) const override {
+      if constexpr (format_checkable<FormatterType>) {
+        return FormatterType::check(ctx);
       } else {
         return {}; // Return success (void) as default
       }
     }
   };
 
-  export struct colorful_formatter {
-    ui::text_format get_level_color(unsigned int lvl) const noexcept {
-      if (lvl < 10) return ui::text_format{}.fg(ui::color::cyan());
+  export struct ColorfulFormatter {
+    tui::TextFormat get_level_color(unsigned int lvl) const noexcept {
+      if (lvl < 10) return tui::TextFormat{}.fg(tui::Color::cyan());
       else if (lvl < 20)
-        return ui::text_format{}.fg(ui::color::blue());
+        return tui::TextFormat{}.fg(tui::Color::blue());
       else if (lvl < 30)
-        return ui::text_format{}.fg(ui::color::green());
+        return tui::TextFormat{}.fg(tui::Color::green());
       else if (lvl < 40)
-        return ui::text_format{}.fg(ui::color::yellow());
+        return tui::TextFormat{}.fg(tui::Color::yellow());
       else if (lvl < 50)
-        return ui::text_format{}.fg(ui::color::magenta());
+        return tui::TextFormat{}.fg(tui::Color::magenta());
       else
-        return ui::text_format{}.fg(ui::color::red());
+        return tui::TextFormat{}.fg(tui::Color::red());
     }
-    std::expected<void, log_error> format(
-      const context &ctx, std::back_insert_iterator<stream_emitter<void>> &it
+    std::expected<void, LogError> format(
+      const Context &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
     ) const {
       std::format_to(
         it,
         "{}[{}]{} {:%FT%TZ} ",
-        ui::cli_node::format_begin(get_level_color(ctx.status.level)),
+        tui::CliNode::format_begin(get_level_color(ctx.status.level)),
         ctx.status.name,
-        ui::cli_node::format_end(),
+        tui::CliNode::format_end(),
         ctx.time
       );
       ctx.message.format(it);
@@ -86,9 +86,9 @@ namespace jowi::crogger {
     }
   };
 
-  export struct bw_formatter {
-    std::expected<void, log_error> format(
-      const context &ctx, std::back_insert_iterator<stream_emitter<void>> &it
+  export struct BwFormatter {
+    std::expected<void, LogError> format(
+      const Context &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
     ) const {
       std::format_to(it, "[{}] {:%FT%TZ} ", ctx.status.name, ctx.time);
       ctx.message.format(it);
@@ -97,17 +97,17 @@ namespace jowi::crogger {
     }
   };
 
-  export struct empty_formatter {
-    std::expected<void, log_error> format(
-      const context &ctx, std::back_insert_iterator<stream_emitter<void>> &it
+  export struct EmptyFormatter {
+    std::expected<void, LogError> format(
+      const Context &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
     ) const {
       return {};
     }
   };
 
-  export struct plain_formatter {
-    std::expected<void, log_error> format(
-      const context &ctx, std::back_insert_iterator<stream_emitter<void>> &it
+  export struct PlainFormatter {
+    std::expected<void, LogError> format(
+      const Context &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
     ) const {
       ctx.message.format(it);
       it = '\n';
@@ -115,7 +115,7 @@ namespace jowi::crogger {
     }
   };
 
-  template struct formatter<bw_formatter>;
-  template struct formatter<colorful_formatter>;
-  template struct formatter<empty_formatter>;
+  template struct Formatter<BwFormatter>;
+  template struct Formatter<ColorfulFormatter>;
+  template struct Formatter<EmptyFormatter>;
 };

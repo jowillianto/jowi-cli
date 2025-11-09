@@ -11,27 +11,27 @@ import :arg_key;
 
 namespace jowi::cli {
 
-  using param_pair = std::pair<arg_key, std::string_view>;
-  struct positional_parsed_arg {
+  using ParamPair = std::pair<ArgKey, std::string_view>;
+  struct PositionalParsedArg {
     std::string_view value;
-    std::vector<param_pair> params;
+    std::vector<ParamPair> params;
   };
-  export class parsed_arg {
-    std::vector<positional_parsed_arg> __values;
-    raw_args_iterator __beg;
-    raw_args_iterator __end;
+  export class ParsedArg {
+    std::vector<PositionalParsedArg> __values;
+    RawArgsIterator __beg;
+    RawArgsIterator __end;
 
-    parsed_arg(raw_args_iterator beg, raw_args_iterator end) : __values{}, __beg{beg}, __end{end} {}
+    ParsedArg(RawArgsIterator beg, RawArgsIterator end) : __values{}, __beg{beg}, __end{end} {}
 
   public:
     // Parameter Control
-    parsed_arg(raw_args args) : __values{}, __beg{args.begin()}, __end{args.end()} {}
-    parsed_arg &add_argument(arg_key key, std::string_view value) {
-      __values.back().params.emplace_back(param_pair{key, value});
+    ParsedArg(RawArgs args) : __values{}, __beg{args.begin()}, __end{args.end()} {}
+    ParsedArg &add_argument(ArgKey key, std::string_view value) {
+      __values.back().params.emplace_back(ParamPair{key, value});
       return *this;
     }
-    positional_parsed_arg &add_argument(std::string_view argument) {
-      return __values.emplace_back(positional_parsed_arg{argument});
+    PositionalParsedArg &add_argument(std::string_view argument) {
+      return __values.emplace_back(PositionalParsedArg{argument});
     }
     std::string_view arg() const noexcept {
       return __values.back().value;
@@ -60,7 +60,7 @@ namespace jowi::cli {
 
     // Query Functions
     constexpr std::optional<std::string_view> first_of(
-      const generic::is_comparable<arg_key> auto &key
+      const generic::is_comparable<ArgKey> auto &key
     ) const noexcept {
       auto it = std::ranges::find_if(param_beg(), param_end(), [&](const auto &p) {
         return p.first == key;
@@ -68,19 +68,19 @@ namespace jowi::cli {
       if (it == param_end()) return std::nullopt;
       return it->second;
     }
-    constexpr bool contains(const generic::is_comparable<arg_key> auto &key) const noexcept {
+    constexpr bool contains(const generic::is_comparable<ArgKey> auto &key) const noexcept {
       return first_of(key).has_value();
     }
-    constexpr auto filter(generic::is_comparable<arg_key> auto key) const noexcept {
+    constexpr auto filter(generic::is_comparable<ArgKey> auto key) const noexcept {
       return std::ranges::transform_view{
         std::ranges::filter_view{
           std::ranges::subrange{param_beg(), param_end()},
-          [key = std::move(key)](const param_pair &p) { return p.first == key; }
+          [key = std::move(key)](const ParamPair &p) { return p.first == key; }
         },
-        &param_pair::second
+        &ParamPair::second
       };
     }
-    constexpr uint64_t count(const generic::is_comparable<arg_key> auto &key) const noexcept {
+    constexpr uint64_t count(const generic::is_comparable<ArgKey> auto &key) const noexcept {
       return std::ranges::count_if(param_beg(), param_end(), [&](const auto &p) {
         return p.first == key;
       });

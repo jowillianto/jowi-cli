@@ -11,71 +11,71 @@ import :error;
 namespace jowi::crogger {
   namespace fs = std::filesystem;
   export template <class T>
-  concept is_emitter = requires(const T emitter, std::string_view data) {
-    { emitter.emit(data) } -> std::same_as<std::expected<void, log_error>>;
+  concept is_emitter = requires(const T Emitter, std::string_view data) {
+    { Emitter.emit(data) } -> std::same_as<std::expected<void, LogError>>;
   };
 
   export template <class T>
-  concept is_stream_emitter = requires(T emitter, char x) {
-    { emitter.push_back(x) } -> std::same_as<void>;
-    { emitter.flush() } -> std::same_as<std::expected<void, log_error>>;
+  concept is_stream_emitter = requires(T Emitter, char x) {
+    { Emitter.push_back(x) } -> std::same_as<void>;
+    { Emitter.flush() } -> std::same_as<std::expected<void, LogError>>;
   };
 
-  export template <class T = void> struct stream_emitter;
-  export template <class T = void> struct emitter;
+  export template <class T = void> struct StreamEmitter;
+  export template <class T = void> struct Emitter;
 
-  template <> struct emitter<void> {
-    virtual std::expected<void, log_error> emit(std::string_view) const = 0;
-    virtual ~emitter() = default;
+  template <> struct Emitter<void> {
+    virtual std::expected<void, LogError> emit(std::string_view) const = 0;
+    virtual ~Emitter() = default;
 
-    template <is_emitter emitter_type, class... Args>
-      requires(std::constructible_from<emitter_type, Args...>)
-    static std::unique_ptr<emitter<void>> make_unique(Args &&...args) {
-      return std::make_unique<emitter<emitter_type>>(std::forward<Args>(args)...);
+    template <is_emitter EmitterType, class... Args>
+      requires(std::constructible_from<EmitterType, Args...>)
+    static std::unique_ptr<Emitter<void>> make_unique(Args &&...args) {
+      return std::make_unique<Emitter<EmitterType>>(std::forward<Args>(args)...);
     }
 
-    template <is_emitter emitter_type, class... Args>
-      requires(std::constructible_from<emitter_type, Args...>)
-    static std::shared_ptr<emitter<void>> make_shared(Args &&...args) {
-      return std::make_shared<emitter<emitter_type>>(std::forward<Args>(args)...);
+    template <is_emitter EmitterType, class... Args>
+      requires(std::constructible_from<EmitterType, Args...>)
+    static std::shared_ptr<Emitter<void>> make_shared(Args &&...args) {
+      return std::make_shared<Emitter<EmitterType>>(std::forward<Args>(args)...);
     }
   };
 
-  export template <is_emitter T> struct emitter<T> : private T, public emitter<void> {
+  export template <is_emitter T> struct Emitter<T> : private T, public Emitter<void> {
     using T::T;
 
-    emitter(T &&v)
+    Emitter(T &&v)
       requires(std::move_constructible<T>)
       : T{std::forward<T &&>(v)} {}
 
-    std::expected<void, log_error> emit(std::string_view d) const override {
+    std::expected<void, LogError> emit(std::string_view d) const override {
       return T::emit(d);
     }
   };
-  template <> struct stream_emitter<void> {
+  template <> struct StreamEmitter<void> {
     using value_type = char;
     virtual void push_back(char x) = 0;
-    virtual std::expected<void, log_error> flush() = 0;
-    virtual ~stream_emitter() = default;
+    virtual std::expected<void, LogError> flush() = 0;
+    virtual ~StreamEmitter() = default;
 
-    template <is_stream_emitter emitter_type, class... Args>
-      requires(std::constructible_from<emitter_type, Args...>)
-    std::unique_ptr<stream_emitter<void>> make_unique(Args &&...args) {
-      return std::make_unique<stream_emitter<emitter_type>>(std::forward<Args>(args)...);
+    template <is_stream_emitter EmitterType, class... Args>
+      requires(std::constructible_from<EmitterType, Args...>)
+    std::unique_ptr<StreamEmitter<void>> make_unique(Args &&...args) {
+      return std::make_unique<StreamEmitter<EmitterType>>(std::forward<Args>(args)...);
     }
 
-    template <is_stream_emitter emitter_type, class... Args>
-      requires(std::constructible_from<emitter_type, Args...>)
-    std::shared_ptr<stream_emitter<void>> make_shared(Args &&...args) {
-      return std::make_shared<stream_emitter<emitter_type>>(std::forward<Args>(args)...);
+    template <is_stream_emitter EmitterType, class... Args>
+      requires(std::constructible_from<EmitterType, Args...>)
+    std::shared_ptr<StreamEmitter<void>> make_shared(Args &&...args) {
+      return std::make_shared<StreamEmitter<EmitterType>>(std::forward<Args>(args)...);
     }
   };
 
   export template <is_stream_emitter T>
-  struct stream_emitter<T> : private T, public stream_emitter<void> {
+  struct StreamEmitter<T> : private T, public StreamEmitter<void> {
     using T::T;
 
-    stream_emitter(T &&v)
+    StreamEmitter(T &&v)
       requires(std::move_constructible<T>)
       : T{std::forward<T &&>(v)} {}
 
@@ -83,26 +83,26 @@ namespace jowi::crogger {
       T::push_back(x);
     }
 
-    std::expected<void, log_error> flush() override {
+    std::expected<void, LogError> flush() override {
       return T::flush();
     }
   };
 
-  export struct ss_emitter {
+  export struct SsEmitter {
   private:
-    std::unique_ptr<emitter<void>> __emt;
+    std::unique_ptr<Emitter<void>> __emt;
     std::string __buf;
     uint64_t __cur;
 
   public:
-    ss_emitter(uint64_t buf_size, is_emitter auto &&emt) :
-      __emt{emitter<>::make_unique<std::decay_t<decltype(emt)>>(std::forward<decltype(emt)>(emt))},
+    SsEmitter(uint64_t buf_size, is_emitter auto &&emt) :
+      __emt{Emitter<>::make_unique<std::decay_t<decltype(emt)>>(std::forward<decltype(emt)>(emt))},
       __buf{}, __cur{0} {
       __buf.reserve(buf_size);
       for (uint64_t i = 0; i < buf_size; i += 1)
         __buf.push_back('\0');
     }
-    ss_emitter(is_emitter auto &&emt) : ss_emitter(120, std::forward<decltype(emt)>(emt)) {}
+    SsEmitter(is_emitter auto &&emt) : SsEmitter(120, std::forward<decltype(emt)>(emt)) {}
     void push_back(char x) {
       __buf[__cur] = x;
       __cur += 1;
@@ -114,7 +114,7 @@ namespace jowi::crogger {
         __cur = 0;
       };
     }
-    std::expected<void, log_error> flush() noexcept(
+    std::expected<void, LogError> flush() noexcept(
       noexcept(__emt->emit(std::declval<std::string_view>()))
     ) {
       return __emt->emit(std::string_view{__buf.begin(), __buf.begin() + __cur}).transform([&]() {
@@ -123,27 +123,27 @@ namespace jowi::crogger {
     }
   };
 
-  export struct empty_emitter {
-    std::expected<void, log_error> emit(std::string_view data) const {
+  export struct EmptyEmitter {
+    std::expected<void, LogError> emit(std::string_view data) const {
       return {};
     }
   };
 
-  export struct file_emitter {
+  export struct FileEmitter {
   private:
     constexpr static auto fcloser = [](FILE *f) { fclose(f); };
-    using file_ptr_type = std::unique_ptr<FILE, decltype(fcloser)>;
-    file_ptr_type __f;
+    using FilePtrType = std::unique_ptr<FILE, decltype(fcloser)>;
+    FilePtrType __f;
     fs::path __path;
 
-    file_emitter(file_ptr_type f, fs::path p) : __f{std::move(f)}, __path{std::move(p)} {}
+    FileEmitter(FilePtrType f, fs::path p) : __f{std::move(f)}, __path{std::move(p)} {}
 
   public:
-    std::expected<void, log_error> emit(std::string_view v) const {
+    std::expected<void, LogError> emit(std::string_view v) const {
       auto res = fwrite(v.data(), sizeof(char), v.length(), __f.get());
       if (res != v.length()) {
         return std::unexpected{
-          log_error{log_error_type::io_error, "cannot write to file {}", __path.c_str()}
+          LogError{LogErrorType::io_error, "cannot write to file {}", __path.c_str()}
         };
       }
       return {};
@@ -153,26 +153,24 @@ namespace jowi::crogger {
       return __path;
     }
 
-    static std::expected<file_emitter, log_error> open(const fs::path &p, bool append) {
+    static std::expected<FileEmitter, LogError> open(const fs::path &p, bool append) {
       FILE *f = fopen(p.c_str(), append ? "a" : "w");
       if (f == nullptr) {
-        return std::unexpected{
-          log_error{log_error_type::io_error, "cannot open file {}", p.c_str()}
-        };
+        return std::unexpected{LogError{LogErrorType::io_error, "cannot open file {}", p.c_str()}};
       }
-      file_ptr_type ptr{f, fcloser};
-      return file_emitter{std::move(ptr), p};
+      FilePtrType ptr{f, fcloser};
+      return FileEmitter{std::move(ptr), p};
     }
   };
 
-  export struct stdout_emitter {
-    std::expected<void, log_error> emit(std::string_view d) const {
+  export struct StdoutEmitter {
+    std::expected<void, LogError> emit(std::string_view d) const {
       fwrite(d.data(), sizeof(char), d.length(), stdout);
       return {};
     }
   };
 
-  template struct emitter<file_emitter>;
-  template struct emitter<stdout_emitter>;
-  template struct emitter<empty_emitter>;
+  template struct Emitter<FileEmitter>;
+  template struct Emitter<StdoutEmitter>;
+  template struct Emitter<EmptyEmitter>;
 }

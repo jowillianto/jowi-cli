@@ -9,102 +9,107 @@ module;
 #include <string_view>
 export module jowi.cli:app;
 import jowi.generic;
-import jowi.cli.ui;
+import jowi.tui;
 import :parse_error;
 import :arg_key;
 import :arg_parser;
 import :parsed_arg;
 import :raw_args;
 import :app_identity;
+namespace tui = jowi::tui;
 
 namespace jowi::cli {
-  export struct app {
+  export struct App {
   private:
-    parsed_arg __args;
-    arg_parser __parser;
+    ParsedArg __args;
+    ArgParser __parser;
 
   public:
-    app_identity id;
-    ui::text_format err_fmt;
-    ui::text_format help_fmt;
-    app(app_identity id, int argc, const char **argv) :
-      __args{raw_args{argc, argv}}, __parser{}, id{std::move(id)},
-      err_fmt{ui::text_format{}.fg(ui::color::red())},
-      help_fmt{ui::text_format{}.fg(ui::color::green())} {
+    AppIdentity id;
+    tui::TextFormat err_fmt;
+    tui::TextFormat help_fmt;
+    App(AppIdentity id, int argc, const char **argv, const char **envp = nullptr) :
+      __args{RawArgs{argc, argv}}, __parser{}, id{std::move(id)},
+      err_fmt{tui::TextFormat{}.fg(tui::Color::red())},
+      help_fmt{tui::TextFormat{}.fg(tui::Color::green())} {
       add_help_argument();
     }
 
-    arg &add_argument() {
+    static App create(AppIdentity id, int argc, const char **argv, const char **envp = nullptr) {
+      return App{std::move(id), argc, argv, envp};
+    }
 
-      arg &arg = __parser.add_argument();
+    Arg &add_argument() {
+
+      Arg &arg = __parser.add_argument();
       add_help_argument();
       return arg;
     }
-    arg &add_argument(arg_key k, arg arg = arg::flag()) {
+    Arg &add_argument(ArgKey k, Arg arg = Arg::flag()) {
       return __parser.add_argument(std::move(k), std::move(arg));
     }
-    arg &add_argument(std::string_view k, arg arg = arg::flag()) {
+    Arg &add_argument(std::string_view k, Arg arg = Arg::flag()) {
       return __parser.add_argument(std::move(k), std::move(arg));
     }
 
-    const parsed_arg &args() const noexcept {
+    const ParsedArg &args() const noexcept {
       return __args;
     }
-    const arg_parser &parser() const noexcept {
+    const ArgParser &parser() const noexcept {
       return __parser;
     }
 
     /*
       Formatting with Error and Help
     */
-    ui::cli_nodes help() const {
-      auto nodes = ui::cli_nodes{};
+    tui::CliNodes help() const {
+      auto nodes = tui::CliNodes{};
       // Print the identity
       nodes.append_nodes(
-        ui::cli_node::text("{} v{}", id.name, id.version),
-        ui::cli_node::new_line(),
+        tui::CliNode::text("{} v{}", id.name, id.version),
+        tui::CliNode::new_line(),
         id.description.length() != 0
-          ? ui::cli_nodes{ui::cli_node::text("{}", id.description), ui::cli_node::new_line()}
-          : ui::cli_nodes{},
+          ? tui::CliNodes{tui::CliNode::text("{}", id.description), tui::CliNode::new_line()}
+          : tui::CliNodes{},
         id.author
-          ? ui::cli_nodes{ui::cli_node::text("By {}", id.author.value()), ui::cli_node::new_line()}
-          : ui::cli_nodes{},
+          ? tui::CliNodes{tui::CliNode::text("By {}", id.author.value()), tui::CliNode::new_line()}
+          : tui::CliNodes{},
         id.license
-          ? ui::
-              cli_nodes{ui::cli_node::text("License: {}", id.license.value()), ui::cli_node::new_line()}
-          : ui::cli_nodes{},
-        ui::cli_node::new_line(),
+          ? tui::
+              CliNodes{tui::CliNode::text("License: {}", id.license.value()), tui::CliNode::new_line()}
+          : tui::CliNodes{},
+        tui::CliNode::new_line(),
         std::ranges::transform_view{
-          args(), [](auto &&arg) { return ui::cli_node::text("{} ", arg.value); }
+          args(), [](auto &&arg) { return tui::CliNode::text("{} ", arg.value); }
         },
-        args().size() == 0 ? ui::cli_nodes{} : ui::cli_nodes{ui::cli_node::new_line()},
-        ui::cli_node::format_begin(help_fmt)
+        args().size() == 0 ? tui::CliNodes{} : tui::CliNodes{tui::CliNode::new_line()},
+        tui::CliNode::format_begin(help_fmt)
       );
       uint64_t start_id = std::max(0, static_cast<int>(args().size()) - 1);
       for (auto arg = __parser.begin() + start_id; arg != __parser.end(); arg += 1) {
         uint64_t cur_arg_id = std::distance(__parser.begin(), arg);
         bool print_cur_pos = cur_arg_id > start_id;
-        auto sub_nodes = ui::cli_nodes{
+        auto sub_nodes = tui::CliNodes{
           print_cur_pos ? static_cast<std::uint8_t>(2) : static_cast<std::uint8_t>(0)
         };
         if (print_cur_pos) {
-          nodes.append_nodes(ui::cli_node::text("arg{}", cur_arg_id), ui::cli_node::new_line());
+          nodes.append_nodes(tui::CliNode::text("arg{}", cur_arg_id), tui::CliNode::new_line());
           arg->pos.help(sub_nodes);
         }
         sub_nodes.append_nodes(
           !(arg->empty())
-            ? ui::cli_nodes{ui::cli_node::text("Keyword Arguments: "), ui::cli_node::new_line()}
-            : ui::cli_nodes{}
+            ? tui::CliNodes{tui::CliNode::text("Keyword Arguments: "), tui::CliNode::new_line()}
+            : tui::CliNodes{}
         );
         for (const auto &[k, arg] : (*arg)) {
-          sub_nodes.append_nodes(ui::cli_node::text("{}: ", k), ui::cli_node::new_line());
-          auto sub_sub_nodes = ui::cli_nodes{2};
+          sub_nodes.append_nodes(tui::CliNode::text("{}: ", k), tui::CliNode::new_line());
+          auto sub_sub_nodes = tui::CliNodes{2};
           arg.help(sub_sub_nodes);
           sub_nodes.append_nodes(std::move(sub_sub_nodes));
         }
         nodes.append_nodes(std::move(sub_nodes));
       }
-      nodes.append_nodes(ui::cli_node::format_end());
+      nodes.append_nodes(tui::CliNode::format_end());
       return nodes;
     }
 
@@ -119,7 +124,7 @@ namespace jowi::cli {
         .as_flag();
     }
 
-    std::expected<void, parse_error> parse_args(bool auto_help = true, bool auto_exit = true) {
+    std::expected<void, ParseError> parse_args(bool auto_help = true, bool auto_exit = true) {
       auto res = __parser.parse(__args);
       auto help_arg_count = __args.count("-h") + __args.count("--help");
       if (help_arg_count != 0 && auto_help) {
@@ -160,10 +165,10 @@ namespace jowi::cli {
         error(
           1,
           "{}",
-          ui::cli_nodes{
-            ui::cli_node::format_begin(err_fmt),
-            ui::cli_node::text(fmt, e, std::forward<Args>(args)...),
-            ui::cli_node::format_end()
+          tui::CliNodes{
+            tui::CliNode::format_begin(err_fmt),
+            tui::CliNode::text(fmt, e, std::forward<Args>(args)...),
+            tui::CliNode::format_end()
           }
         );
       });
@@ -184,10 +189,10 @@ namespace jowi::cli {
       std::println(
         stderr,
         "{}",
-        ui::cli_nodes{
-          ui::cli_node::format_begin(err_fmt),
-          ui::cli_node::text(fmt, std::forward<Args>(args)...),
-          ui::cli_node::format_end()
+        tui::CliNodes{
+          tui::CliNode::format_begin(err_fmt),
+          tui::CliNode::text(fmt, std::forward<Args>(args)...),
+          tui::CliNode::format_end()
         }
       );
       std::exit(ret_code);

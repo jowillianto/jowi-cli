@@ -6,22 +6,22 @@ export module jowi.cli:app_identity;
 import :app_version;
 
 namespace jowi::cli {
-  export struct app_identity {
+  export struct AppIdentity {
     std::string name;
     std::string description;
     std::optional<std::string> author = std::nullopt;
     std::optional<std::string> license = std::nullopt;
-    app_version version;
+    AppVersion version;
   };
 }
 
 namespace cli = jowi::cli;
 
-template <class char_type> struct std::formatter<cli::app_identity, char_type> {
+template <class CharType> struct std::formatter<cli::AppIdentity, CharType> {
   constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
-  auto format(const cli::app_identity &v, auto &ctx) const {
+  auto format(const cli::AppIdentity &v, auto &ctx) const {
     std::format_to(ctx.out(), "{} v{}\n", v.name, v.version);
     std::format_to(ctx.out(), "{}\n", v.description);
     if (v.author) std::format_to(ctx.out(), "Written by : {}\n", *v.author);

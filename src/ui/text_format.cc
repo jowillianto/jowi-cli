@@ -2,11 +2,11 @@ module;
 #include <format>
 #include <optional>
 #include <unordered_set>
-export module jowi.cli.ui:text_format;
+export module jowi.tui:text_format;
 import :color;
 
-namespace jowi::cli::ui {
-  export enum struct text_effect {
+namespace jowi::tui {
+  export enum struct TextEffect {
     bold,
     dim,
     italic,
@@ -18,39 +18,39 @@ namespace jowi::cli::ui {
     double_underline
   };
 
-  export class text_format {
+  export class TextFormat {
   private:
-    std::optional<color> __bg;
-    std::optional<color> __fg;
-    std::unordered_set<text_effect> __effects;
+    std::optional<Color> __bg;
+    std::optional<Color> __fg;
+    std::unordered_set<TextEffect> __effects;
 
   public:
-    text_format() : __bg{std::nullopt}, __fg{std::nullopt}, __effects{} {}
+    TextFormat() : __bg{std::nullopt}, __fg{std::nullopt}, __effects{} {}
     // Builder methods
-    text_format &bg(const color &c) {
+    TextFormat &bg(const Color &c) {
       __bg = c;
       return *this;
     }
 
-    text_format &fg(const color &c) {
+    TextFormat &fg(const Color &c) {
       __fg = c;
       return *this;
     }
 
-    text_format &effect(text_effect e) {
+    TextFormat &effect(TextEffect e) {
       __effects.insert(e);
       return *this;
     }
 
     template <std::ranges::range Range>
-      requires std::convertible_to<std::ranges::range_value_t<Range>, text_effect>
-    text_format &effects(Range &&range) {
+      requires std::convertible_to<std::ranges::range_value_t<Range>, TextEffect>
+    TextFormat &effects(Range &&range) {
       __effects.insert_range(std::forward<Range>(range));
       return *this;
     }
 
     // Effects Query method
-    bool has_effect(text_effect e) const {
+    bool has_effect(TextEffect e) const {
       return __effects.contains(e);
     }
     std::uint64_t effects_size() const {
@@ -62,15 +62,15 @@ namespace jowi::cli::ui {
     constexpr auto effects_end() const {
       return __effects.end();
     }
-    const std::optional<color> &get_bg() const {
+    const std::optional<Color> &get_bg() const {
       return __bg;
     }
-    const std::optional<color> &get_fg() const {
+    const std::optional<Color> &get_fg() const {
       return __fg;
     }
 
     // Comparison operators
-    friend bool operator==(const text_format &l, const text_format &r) {
+    friend bool operator==(const TextFormat &l, const TextFormat &r) {
       if (l.__bg.has_value() != r.__bg.has_value() || l.__fg.has_value() != l.__fg.has_value() ||
           l.__effects != r.__effects) {
         return false;
@@ -86,37 +86,37 @@ namespace jowi::cli::ui {
   };
 }
 
-template <class char_type> struct std::formatter<jowi::cli::ui::text_effect, char_type> {
+template <class CharType> struct std::formatter<jowi::tui::TextEffect, CharType> {
   constexpr auto parse(auto &ctx) const {
     return ctx.begin();
   }
-  constexpr auto format(const jowi::cli::ui::text_effect &e, auto &ctx) const {
+  constexpr auto format(const jowi::tui::TextEffect &e, auto &ctx) const {
     switch (e) {
-      case jowi::cli::ui::text_effect::bold:
+      case jowi::tui::TextEffect::bold:
         std::format_to(ctx.out(), "\x1b[1m");
         break;
-      case jowi::cli::ui::text_effect::dim:
+      case jowi::tui::TextEffect::dim:
         std::format_to(ctx.out(), "\x1b[2m");
         break;
-      case jowi::cli::ui::text_effect::italic:
+      case jowi::tui::TextEffect::italic:
         std::format_to(ctx.out(), "\x1b[3m");
         break;
-      case jowi::cli::ui::text_effect::underline:
+      case jowi::tui::TextEffect::underline:
         std::format_to(ctx.out(), "\x1b[4m");
         break;
-      case jowi::cli::ui::text_effect::slow_blink:
+      case jowi::tui::TextEffect::slow_blink:
         std::format_to(ctx.out(), "\x1b[5m");
         break;
-      case jowi::cli::ui::text_effect::rapid_blink:
+      case jowi::tui::TextEffect::rapid_blink:
         std::format_to(ctx.out(), "\x1b[6m");
         break;
-      case jowi::cli::ui::text_effect::reverse:
+      case jowi::tui::TextEffect::reverse:
         std::format_to(ctx.out(), "\x1b[7m");
         break;
-      case jowi::cli::ui::text_effect::strikethrough:
+      case jowi::tui::TextEffect::strikethrough:
         std::format_to(ctx.out(), "\x1b[9m");
         break;
-      case jowi::cli::ui::text_effect::double_underline:
+      case jowi::tui::TextEffect::double_underline:
         std::format_to(ctx.out(), "\x1b[21m");
         break;
     }
@@ -124,11 +124,11 @@ template <class char_type> struct std::formatter<jowi::cli::ui::text_effect, cha
   }
 };
 
-template <class char_type> struct std::formatter<jowi::cli::ui::text_format, char_type> {
+template <class CharType> struct std::formatter<jowi::tui::TextFormat, CharType> {
   constexpr auto parse(auto &ctx) const {
     return ctx.begin();
   }
-  constexpr auto format(const jowi::cli::ui::text_format &fmt, auto &ctx) const {
+  constexpr auto format(const jowi::tui::TextFormat &fmt, auto &ctx) const {
     auto bg = fmt.get_bg();
     auto fg = fmt.get_fg();
     if (bg) {

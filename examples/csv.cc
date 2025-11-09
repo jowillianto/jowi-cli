@@ -1,20 +1,20 @@
 import jowi.cli;
-import jowi.cli.ui;
+import jowi.tui;
 #include <filesystem>
 #include <fstream>
 #include <print>
 #include <ranges>
 
 namespace cli = jowi::cli;
-namespace ui = jowi::cli::ui;
+namespace tui = jowi::tui;
 namespace fs = std::filesystem;
 
 int main(int argc, const char **argv) {
-  cli::app app{
-    cli::app_identity{
+  cli::App app{
+    cli::AppIdentity{
       .name = "CSV Reader",
       .description = "A Simple to use csv reader",
-      .version = cli::app_version{0, 0, 0}
+      .version = cli::AppVersion{0, 0, 0}
     },
     argc,
     argv
@@ -35,26 +35,28 @@ int main(int argc, const char **argv) {
   std::string line;
   bool is_first_line = true;
   while (std::getline(csv_file, line, '\n')) {
-    auto comma_sep = std::ranges::transform_view(std::ranges::split_view(line, ','), [](auto &&s) {
-      return ui::cli_node::text("{}", std::string_view{s.begin(), s.end()});
-    });
+    auto comma_sep =
+      std::views::split(line, ',') |
+      std::views::transform([](auto &&s) {
+        return tui::CliNode::text("{}", std::string_view{s.begin(), s.end()});
+      });
     if (is_first_line && headers) {
       app.out(
         "{}",
-        ui::cli_nodes{
-          ui::cli_node::format_begin(
-            ui::text_format{}
-              .effect(ui::text_effect::bold)
-              .effect(ui::text_effect::underline)
-              .fg(ui::color::bright_blue())
+        tui::CliNodes{
+          tui::CliNode::format_begin(
+            tui::TextFormat{}
+              .effect(tui::TextEffect::bold)
+              .effect(tui::TextEffect::underline)
+              .fg(tui::Color::bright_blue())
           ),
           comma_sep,
-          ui::cli_node::format_end()
+          tui::CliNode::format_end()
         }
       );
       is_first_line = false;
     } else {
-      app.out("{}", ui::cli_nodes{comma_sep});
+      app.out("{}", tui::CliNodes{comma_sep});
     }
   }
 }

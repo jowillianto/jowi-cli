@@ -16,111 +16,111 @@ export import :severity;
 */
 
 namespace jowi::crogger {
-  static logger root_logger{};
+  static Logger root_logger{};
 
-  export logger &root() {
+  export Logger &root() {
     return root_logger;
   }
 
-  export std::expected<void, log_error> log(
-    const logger &l,
-    severity status,
-    const raw_message &fmt,
+  export std::expected<void, LogError> log(
+    const Logger &l,
+    Severity status,
+    const RawMessage &fmt,
     std::source_location loc = std::source_location::current()
   ) {
     auto t = std::chrono::system_clock::now();
-    return l.log(context{status, loc, t, fmt});
+    return l.log(Context{status, loc, t, fmt});
   }
 
-  export std::expected<void, log_error> log(
-    severity status,
-    const raw_message &fmt,
+  export std::expected<void, LogError> log(
+    Severity status,
+    const RawMessage &fmt,
     std::source_location loc = std::source_location::current()
   ) {
     return log(root(), status, fmt, loc);
   }
-  export std::expected<void, log_error> trace(
-    const logger &l,
-    const raw_message &fmt,
+  export std::expected<void, LogError> trace(
+    const Logger &l,
+    const RawMessage &fmt,
     std::source_location loc = std::source_location::current()
   ) {
-    return log(l, severity::trace(), fmt, loc);
+    return log(l, Severity::trace(), fmt, loc);
   }
 
-  export std::expected<void, log_error> debug(
-    const logger &l,
-    const raw_message &fmt,
+  export std::expected<void, LogError> debug(
+    const Logger &l,
+    const RawMessage &fmt,
     std::source_location loc = std::source_location::current()
   ) {
-    return log(l, severity::debug(), fmt, loc);
+    return log(l, Severity::debug(), fmt, loc);
   }
 
-  export std::expected<void, log_error> info(
-    const logger &l,
-    const raw_message &fmt,
+  export std::expected<void, LogError> info(
+    const Logger &l,
+    const RawMessage &fmt,
     std::source_location loc = std::source_location::current()
   ) {
-    return log(l, severity::info(), fmt, loc);
+    return log(l, Severity::info(), fmt, loc);
   }
 
-  export std::expected<void, log_error> warn(
-    const logger &l,
-    const raw_message &fmt,
+  export std::expected<void, LogError> warn(
+    const Logger &l,
+    const RawMessage &fmt,
     std::source_location loc = std::source_location::current()
   ) {
-    return log(l, severity::warn(), fmt, loc);
+    return log(l, Severity::warn(), fmt, loc);
   }
 
-  export std::expected<void, log_error> error(
-    const logger &l,
-    const raw_message &fmt,
+  export std::expected<void, LogError> error(
+    const Logger &l,
+    const RawMessage &fmt,
     std::source_location loc = std::source_location::current()
   ) {
-    return log(l, severity::error(), fmt, loc);
+    return log(l, Severity::error(), fmt, loc);
   }
 
-  export std::expected<void, log_error> critical(
-    const logger &l,
-    const raw_message &fmt,
+  export std::expected<void, LogError> critical(
+    const Logger &l,
+    const RawMessage &fmt,
     std::source_location loc = std::source_location::current()
   ) {
-    return log(l, severity::critical(), fmt, loc);
+    return log(l, Severity::critical(), fmt, loc);
   }
 
   // Global shortcuts (using root_logger)
-  export std::expected<void, log_error> trace(
-    const raw_message &fmt, std::source_location loc = std::source_location::current()
+  export std::expected<void, LogError> trace(
+    const RawMessage &fmt, std::source_location loc = std::source_location::current()
   ) {
-    return log(severity::trace(), fmt, loc);
+    return log(Severity::trace(), fmt, loc);
   }
 
-  export std::expected<void, log_error> debug(
-    const raw_message &fmt, std::source_location loc = std::source_location::current()
+  export std::expected<void, LogError> debug(
+    const RawMessage &fmt, std::source_location loc = std::source_location::current()
   ) {
-    return log(severity::debug(), fmt, loc);
+    return log(Severity::debug(), fmt, loc);
   }
 
-  export std::expected<void, log_error> info(
-    const raw_message &fmt, std::source_location loc = std::source_location::current()
+  export std::expected<void, LogError> info(
+    const RawMessage &fmt, std::source_location loc = std::source_location::current()
   ) {
-    return log(severity::info(), fmt, loc);
+    return log(Severity::info(), fmt, loc);
   }
 
-  export std::expected<void, log_error> warn(
-    const raw_message &fmt, std::source_location loc = std::source_location::current()
+  export std::expected<void, LogError> warn(
+    const RawMessage &fmt, std::source_location loc = std::source_location::current()
   ) {
-    return log(severity::warn(), fmt, loc);
+    return log(Severity::warn(), fmt, loc);
   }
 
-  export std::expected<void, log_error> error(
-    const raw_message &fmt, std::source_location loc = std::source_location::current()
+  export std::expected<void, LogError> error(
+    const RawMessage &fmt, std::source_location loc = std::source_location::current()
   ) {
-    return log(severity::error(), fmt, loc);
+    return log(Severity::error(), fmt, loc);
   }
 
-  export std::expected<void, log_error> critical(
-    const raw_message &fmt, std::source_location loc = std::source_location::current()
+  export std::expected<void, LogError> critical(
+    const RawMessage &fmt, std::source_location loc = std::source_location::current()
   ) {
-    return log(severity::critical(), fmt, loc);
+    return log(Severity::critical(), fmt, loc);
   }
 }

@@ -11,39 +11,39 @@ namespace jowi::cli {
   /*
     Shortcut Parse Functions (to number)
   */
-  export template <class T> struct parse_shortcut {
-    std::expected<T, parse_error> from(std::string_view v) = delete;
+  export template <class T> struct ParseShortcut {
+    std::expected<T, ParseError> from(std::string_view v) = delete;
   };
 
-  template <class num_type>
-    requires(std::floating_point<num_type> || std::integral<num_type>)
-  struct parse_shortcut<num_type> {
-    std::expected<num_type, parse_error> from(std::string_view v) {
-      num_type num;
+  template <class NumType>
+    requires(std::floating_point<NumType> || std::integral<NumType>)
+  struct ParseShortcut<NumType> {
+    std::expected<NumType, ParseError> from(std::string_view v) {
+      NumType num;
       auto res = std::from_chars(v.begin(), v.end(), num);
       if (res.ec == std::errc{}) {
         return num;
       } else {
-        return std::unexpected{parse_error{parse_error_type::INVALID_VALUE, "{} not a number", v}};
+        return std::unexpected{ParseError{ParseErrorType::INVALID_VALUE, "{} not a number", v}};
       }
     }
   };
 
-  template <std::constructible_from<std::string_view> T> struct parse_shortcut<T> {
+  template <std::constructible_from<std::string_view> T> struct ParseShortcut<T> {
     T from(std::string_view v) {
       return T{v};
     }
   };
 
   template <class T>
-  concept has_shortcut = requires(std::string_view v, parse_shortcut<T> parser) {
+  concept has_shortcut = requires(std::string_view v, ParseShortcut<T> parser) {
     { parser.from(v) };
   };
 
   export template <has_shortcut T>
-    requires(std::constructible_from<parse_shortcut<T>>)
+    requires(std::constructible_from<ParseShortcut<T>>)
   auto parse_arg(std::string_view v) {
-    return parse_shortcut<T>{}.from(v);
+    return ParseShortcut<T>{}.from(v);
   }
 
   /*

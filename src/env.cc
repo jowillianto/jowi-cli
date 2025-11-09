@@ -11,12 +11,12 @@ import jowi.generic;
 import :parse_error;
 
 namespace jowi::cli {
-  struct app_env {
+  struct AppEnv {
   private:
     generic::key_vector<std::string, std::string> __env;
 
   public:
-    app_env() {}
+    AppEnv() {}
 
     /*
       get_env.
@@ -29,17 +29,17 @@ namespace jowi::cli {
 
     /*
       set_env
-      This will only return parse_error if value or key contains =. If the input is sanitized
+      This will only return ParseError if value or key contains =. If the input is sanitized
       such that it does not contain '=', then this error will not happen.
     */
-    std::expected<std::string_view, parse_error> set_env(
+    std::expected<std::string_view, ParseError> set_env(
       std::string_view key, std::string_view value
     ) {
       if (key.contains('=')) {
-        return std::unexpected{parse_error::invalid_value("key {} contains '='", key)};
+        return std::unexpected{ParseError::invalid_value("key {} contains '='", key)};
       }
       if (value.contains('=')) {
-        return std::unexpected{parse_error::invalid_value("value {} contains '='", value)};
+        return std::unexpected{ParseError::invalid_value("value {} contains '='", value)};
       }
       return __env.emplace(key, value);
     }
@@ -64,14 +64,14 @@ namespace jowi::cli {
       return __env.size();
     }
 
-    static std::expected<app_env, parse_error> from_ptr(const char **envp) {
-      const char *envp_entry = envp[0];
-      app_env env;
+    constexpr static std::expected<AppEnv, ParseError> from_ptr(const char **envp) {
+      const char **envp_entry = envp;
+      AppEnv env;
       while (envp_entry != nullptr) {
-        std::string_view entry{envp_entry};
+        std::string_view entry{*envp_entry};
         auto eq_pos = std::ranges::find(entry, '=');
         if (eq_pos == entry.end()) {
-          return std::unexpected{parse_error::invalid_value("no '=' found for {}", entry)};
+          return std::unexpected{ParseError::invalid_value("no '=' found for {}", entry)};
         }
         auto key = std::string_view{entry.begin(), eq_pos};
         auto value = std::string_view{eq_pos + 1, entry.end()};
@@ -79,6 +79,7 @@ namespace jowi::cli {
         if (!res) {
           return std::unexpected{std::move(res.error())};
         }
+        envp_entry += 1;
       }
       return env;
     }

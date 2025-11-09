@@ -8,12 +8,13 @@ module;
 #include <string_view>
 #include <vector>
 export module jowi.cli:arg;
-import jowi.cli.ui;
+import jowi.tui;
 import jowi.generic;
 import :app_version;
 import :parse_error;
 import :parsed_arg;
 import :arg_key;
+namespace tui = jowi::tui;
 
 namespace jowi::cli {
   export template <class T>
@@ -22,90 +23,90 @@ namespace jowi::cli {
   };
 
   export template <class T>
-  concept help_providing_arg_validator = requires(const std::decay_t<T> t, ui::cli_nodes &a) {
-    { t.help(a) } -> std::same_as<ui::cli_nodes &>;
+  concept help_providing_arg_validator = requires(const std::decay_t<T> t, tui::CliNodes &a) {
+    { t.help(a) } -> std::same_as<tui::CliNodes &>;
   };
 
   export template <class T>
   concept value_arg_validator =
     requires(const std::decay_t<T> t, std::optional<std::string_view> sv) {
-      { t.validate(sv) } -> std::same_as<std::expected<void, parse_error>>;
+      { t.validate(sv) } -> std::same_as<std::expected<void, ParseError>>;
     };
 
   export template <class T>
   concept post_validate_arg_validator = requires(
     const std::decay_t<T> t,
-    std::optional<std::reference_wrapper<const arg_key>> key,
-    parsed_arg &pa
+    std::optional<std::reference_wrapper<const ArgKey>> key,
+    ParsedArg &pa
   ) {
-    { t.post_validate(key, pa) } -> std::same_as<std::expected<void, parse_error>>;
+    { t.post_validate(key, pa) } -> std::same_as<std::expected<void, ParseError>>;
   };
 
-  export template <class validator_type>
+  export template <class ValidatorType>
   concept is_arg_validator =
-    unique_arg_validator<validator_type> || help_providing_arg_validator<validator_type> ||
-    value_arg_validator<validator_type> || post_validate_arg_validator<validator_type>;
+    unique_arg_validator<ValidatorType> || help_providing_arg_validator<ValidatorType> ||
+    value_arg_validator<ValidatorType> || post_validate_arg_validator<ValidatorType>;
 
   template <class T>
     requires(is_arg_validator<T> || std::same_as<T, void>)
-  struct arg_validator;
+  struct ArgValidator;
 
-  template <> struct arg_validator<void> {
+  template <> struct ArgValidator<void> {
     virtual std::optional<std::string> id() const = 0;
-    virtual ui::cli_nodes &help(ui::cli_nodes &nodes) const = 0;
-    virtual std::expected<void, parse_error> validate(
+    virtual tui::CliNodes &help(tui::CliNodes &nodes) const = 0;
+    virtual std::expected<void, ParseError> validate(
       std::optional<std::string_view> value
     ) const = 0;
-    virtual std::expected<void, parse_error> post_validate(
-      std::optional<std::reference_wrapper<const arg_key>> key, parsed_arg &args
+    virtual std::expected<void, ParseError> post_validate(
+      std::optional<std::reference_wrapper<const ArgKey>> key, ParsedArg &args
     ) const = 0;
-    virtual ~arg_validator() = default;
+    virtual ~ArgValidator() = default;
   };
-  template <is_arg_validator validator_type>
-  struct arg_validator<validator_type> : private validator_type, arg_validator<void> {
-    using validator_type::validator_type;
-    arg_validator(validator_type validator) : validator_type{std::move(validator)} {}
+  template <is_arg_validator ValidatorType>
+  struct ArgValidator<ValidatorType> : private ValidatorType, ArgValidator<void> {
+    using ValidatorType::ValidatorType;
+    ArgValidator(ValidatorType validator) : ValidatorType{std::move(validator)} {}
     std::optional<std::string> id() const override {
-      if constexpr (unique_arg_validator<validator_type>) {
-        return validator_type::id();
+      if constexpr (unique_arg_validator<ValidatorType>) {
+        return ValidatorType::id();
       } else {
         return std::nullopt;
       }
     }
-    ui::cli_nodes &help(ui::cli_nodes &nodes) const override {
-      if constexpr (help_providing_arg_validator<validator_type>) {
-        return validator_type::help(nodes);
+    tui::CliNodes &help(tui::CliNodes &nodes) const override {
+      if constexpr (help_providing_arg_validator<ValidatorType>) {
+        return ValidatorType::help(nodes);
       } else {
         return nodes;
       }
     }
-    std::expected<void, parse_error> validate(
+    std::expected<void, ParseError> validate(
       std::optional<std::string_view> value
     ) const override {
-      if constexpr (value_arg_validator<validator_type>) {
-        return validator_type::validate(value);
+      if constexpr (value_arg_validator<ValidatorType>) {
+        return ValidatorType::validate(value);
       } else {
         return {};
       }
     }
-    std::expected<void, parse_error> post_validate(
-      std::optional<std::reference_wrapper<const arg_key>> key, parsed_arg &args
+    std::expected<void, ParseError> post_validate(
+      std::optional<std::reference_wrapper<const ArgKey>> key, ParsedArg &args
     ) const override {
-      if constexpr (post_validate_arg_validator<validator_type>) {
-        return validator_type::post_validate(key, args);
+      if constexpr (post_validate_arg_validator<ValidatorType>) {
+        return ValidatorType::post_validate(key, args);
       } else {
         return {};
       }
     }
   };
 
-  export struct arg_option {
+  export struct ArgOption {
   private:
     std::string __value;
     std::optional<std::string> __help_text;
 
   public:
-    arg_option(std::string v, std::optional<std::string> help_text = std::nullopt) :
+    ArgOption(std::string v, std::optional<std::string> help_text = std::nullopt) :
       __value{std::move(v)}, __help_text{std::move(help_text)} {}
     std::string_view value() const noexcept {
       return __value;
@@ -113,29 +114,29 @@ namespace jowi::cli {
     std::optional<std::string_view> help_text() const noexcept {
       return __help_text;
     }
-    arg_option &help(std::string msg) {
+    ArgOption &help(std::string msg) {
       __help_text.emplace(msg);
       return *this;
     }
-    template <class... Args> arg_option &help(std::format_string<Args...> fmt, Args &&...args) {
+    template <class... Args> ArgOption &help(std::format_string<Args...> fmt, Args &&...args) {
       __help_text.emplace(std::format(fmt, std::forward<Args>(args)...));
       return *this;
     }
   };
 
-  export struct arg_options_validator {
+  export struct ArgOptionsValidator {
   private:
-    std::vector<arg_option> __options;
+    std::vector<ArgOption> __options;
 
-    std::optional<std::reference_wrapper<arg_option>> __get(std::string_view value) {
-      auto it = std::ranges::find(__options, value, &arg_option::value);
+    std::optional<std::reference_wrapper<ArgOption>> __get(std::string_view value) {
+      auto it = std::ranges::find(__options, value, &ArgOption::value);
       if (it == __options.end()) {
         return std::nullopt;
       }
       return std::ref(*it);
     }
-    std::optional<std::reference_wrapper<const arg_option>> __get(std::string_view value) const {
-      auto it = std::ranges::find(__options, value, &arg_option::value);
+    std::optional<std::reference_wrapper<const ArgOption>> __get(std::string_view value) const {
+      auto it = std::ranges::find(__options, value, &ArgOption::value);
       if (it == __options.end()) {
         return std::nullopt;
       }
@@ -143,23 +144,23 @@ namespace jowi::cli {
     }
 
   public:
-    constexpr arg_options_validator() : __options{} {}
+    constexpr ArgOptionsValidator() : __options{} {}
 
-    constexpr arg_options_validator &add_option(std::string_view value) {
+    constexpr ArgOptionsValidator &add_option(std::string_view value) {
       if (__get(value)) return *this;
-      __options.emplace_back(arg_option{std::string{value}});
+      __options.emplace_back(ArgOption{std::string{value}});
       return *this;
     }
-    constexpr arg_options_validator &add_option(std::string_view value, std::string help_text) {
+    constexpr ArgOptionsValidator &add_option(std::string_view value, std::string help_text) {
       auto current_option = __get(value);
       if (current_option) {
         current_option.value().get().help(std::move(help_text));
       } else {
-        __options.emplace_back(arg_option{std::string{value}, std::move(help_text)});
+        __options.emplace_back(ArgOption{std::string{value}, std::move(help_text)});
       }
       return *this;
     }
-    constexpr arg_options_validator move() noexcept {
+    constexpr ArgOptionsValidator move() noexcept {
       return std::move(*this);
     }
 
@@ -182,101 +183,101 @@ namespace jowi::cli {
     std::optional<std::string> id() const {
       return "arg_options";
     }
-    ui::cli_nodes &help(ui::cli_nodes &nodes) const {
+    tui::CliNodes &help(tui::CliNodes &nodes) const {
       if (empty()) {
         return nodes;
       }
 
-      nodes.append_nodes(ui::cli_node::text("Options: "), ui::cli_node::new_line());
+      nodes.append_nodes(tui::CliNode::text("Options: "), tui::CliNode::new_line());
       for (const auto &option : __options) {
         auto help_text = option.help_text();
         if (help_text) {
           nodes.append_nodes(
-            ui::cli_node::text("- {}: {}", option.value(), help_text.value()),
-            ui::cli_node::new_line()
+            tui::CliNode::text("- {}: {}", option.value(), help_text.value()),
+            tui::CliNode::new_line()
           );
         } else {
           nodes.append_nodes(
-            ui::cli_node::text("- {}: <no-help>", option.value()), ui::cli_node::new_line()
+            tui::CliNode::text("- {}: <no-help>", option.value()), tui::CliNode::new_line()
           );
         }
       }
       return nodes;
     }
 
-    std::expected<void, parse_error> validate(std::optional<std::string_view> value) const {
+    std::expected<void, ParseError> validate(std::optional<std::string_view> value) const {
       if (!value) {
-        return std::unexpected{parse_error{parse_error_type::NO_VALUE_GIVEN, ""}};
+        return std::unexpected{ParseError{ParseErrorType::NO_VALUE_GIVEN, ""}};
       }
       if (!__get(value.value())) {
         return std::unexpected{
-          parse_error{parse_error_type::INVALID_VALUE, "{} is not a valid option.", value.value()}
+          ParseError{ParseErrorType::INVALID_VALUE, "{} is not a valid option.", value.value()}
         };
       }
       return {};
     }
   };
 
-  export struct arg_count_validator {
+  export struct ArgCountValidator {
     uint64_t min_size;
     uint64_t max_size;
 
-    arg_count_validator(uint64_t min_size, uint64_t max_size) :
+    ArgCountValidator(uint64_t min_size, uint64_t max_size) :
       min_size{min_size}, max_size{max_size} {}
 
     /*
       Factory Functions
     */
-    static arg_count_validator range(uint64_t min_size, uint64_t max_size) {
-      return arg_count_validator{min_size, max_size};
+    static ArgCountValidator range(uint64_t min_size, uint64_t max_size) {
+      return ArgCountValidator{min_size, max_size};
     }
 
-    static arg_count_validator at_least(uint64_t min_size) {
-      return arg_count_validator::range(min_size, static_cast<uint64_t>(-1));
+    static ArgCountValidator at_least(uint64_t min_size) {
+      return ArgCountValidator::range(min_size, static_cast<uint64_t>(-1));
     }
-    static arg_count_validator at_most(uint64_t max_size) {
-      return arg_count_validator::range(0, max_size);
+    static ArgCountValidator at_most(uint64_t max_size) {
+      return ArgCountValidator::range(0, max_size);
     }
-    static arg_count_validator equal_to(uint64_t v) {
-      return arg_count_validator::range(v, v);
+    static ArgCountValidator equal_to(uint64_t v) {
+      return ArgCountValidator::range(v, v);
     }
-    static arg_count_validator one() {
-      return arg_count_validator::range(1, 1);
+    static ArgCountValidator one() {
+      return ArgCountValidator::range(1, 1);
     }
 
     /* Validator Implementation */
     std::optional<std::string> id() const {
-      return "arg_count_validator";
+      return "ArgCountValidator";
     }
-    ui::cli_nodes &help(ui::cli_nodes &nodes) const {
+    tui::CliNodes &help(tui::CliNodes &nodes) const {
       if (min_size == max_size && min_size != 1) {
         nodes.append_nodes(
-          ui::cli_node::text("Arg Count: ={}", min_size), ui::cli_node::new_line()
+          tui::CliNode::text("Arg Count: ={}", min_size), tui::CliNode::new_line()
         );
       } else if (min_size == 0 && max_size == 1) {
-        nodes.append_nodes(ui::cli_node::text("Optional"), ui::cli_node::new_line());
+        nodes.append_nodes(tui::CliNode::text("Optional"), tui::CliNode::new_line());
       } else if (min_size == 1 && max_size == 1) {
-        nodes.append_nodes(ui::cli_node::text("Required"), ui::cli_node::new_line());
+        nodes.append_nodes(tui::CliNode::text("Required"), tui::CliNode::new_line());
       } else if (min_size == 1 && max_size == -1) {
         nodes.append_nodes(
-          ui::cli_node::text("Arg Count: >= {}", min_size), ui::cli_node::new_line()
+          tui::CliNode::text("Arg Count: >= {}", min_size), tui::CliNode::new_line()
         );
       } else {
         nodes.append_nodes(
-          ui::cli_node::text("Arg Count: {} <= n <= {}", min_size, max_size),
-          ui::cli_node::new_line()
+          tui::CliNode::text("Arg Count: {} <= n <= {}", min_size, max_size),
+          tui::CliNode::new_line()
         );
       }
       return nodes;
     }
-    std::expected<void, parse_error> post_validate(
-      std::optional<std::reference_wrapper<const arg_key>> key, parsed_arg &args
+    std::expected<void, ParseError> post_validate(
+      std::optional<std::reference_wrapper<const ArgKey>> key, ParsedArg &args
     ) const {
       uint64_t arg_count =
-        key.transform([&](const arg_key &k) { return args.count(k); }).value_or(1);
+        key.transform([&](const ArgKey &k) { return args.count(k); }).value_or(1);
       if (arg_count > max_size || arg_count < min_size) {
-        return std::unexpected{parse_error{
-          parse_error_type::TOO_MANY_VALUE_GIVEN,
+        return std::unexpected{ParseError{
+          ParseErrorType::TOO_MANY_VALUE_GIVEN,
           "{} not in {} <= x <= {}",
           arg_count,
           min_size,
@@ -287,59 +288,59 @@ namespace jowi::cli {
     }
   };
 
-  export struct arg_empty_validator {
+  export struct ArgEmptyValidator {
   private:
     bool __allow;
 
   public:
-    arg_empty_validator(bool allow) : __allow{allow} {}
+    ArgEmptyValidator(bool allow) : __allow{allow} {}
 
     std::optional<std::string> id() const {
-      return "arg_empty_validator";
+      return "ArgEmptyValidator";
     }
-    ui::cli_nodes &help(ui::cli_nodes &nodes) const {
+    tui::CliNodes &help(tui::CliNodes &nodes) const {
       if (__allow) {
-        nodes.append_nodes(ui::cli_node::text("Flag"), ui::cli_node::new_line());
+        nodes.append_nodes(tui::CliNode::text("Flag"), tui::CliNode::new_line());
       }
       return nodes;
     }
-    std::expected<void, parse_error> validate(std::optional<std::string_view> value) const {
+    std::expected<void, ParseError> validate(std::optional<std::string_view> value) const {
       if (!__allow && !value) {
-        return std::unexpected{parse_error{parse_error_type::NO_VALUE_GIVEN, ""}};
+        return std::unexpected{ParseError{ParseErrorType::NO_VALUE_GIVEN, ""}};
       }
       return {};
     }
-    std::expected<void, parse_error> post_validate(
-      std::optional<std::reference_wrapper<const arg_key>> key, parsed_arg &args
+    std::expected<void, ParseError> post_validate(
+      std::optional<std::reference_wrapper<const ArgKey>> key, ParsedArg &args
     ) const {
       return {};
     }
   };
 
-  export struct arg {
+  export struct Arg {
   private:
-    std::vector<std::unique_ptr<arg_validator<void>>> __vtors;
+    std::vector<std::unique_ptr<ArgValidator<void>>> __vtors;
     std::optional<std::string> __help_text;
 
   public:
-    arg(std::optional<std::string> h = std::nullopt) : __vtors{}, __help_text{std::move(h)} {}
+    Arg(std::optional<std::string> h = std::nullopt) : __vtors{}, __help_text{std::move(h)} {}
 
     // Builder Pattern
-    arg &help(std::string help_text) {
+    Arg &help(std::string help_text) {
       __help_text.emplace(help_text);
       return *this;
     }
-    template <class... Args> arg &help(std::format_string<Args...> fmt, Args &&...args) {
+    template <class... Args> Arg &help(std::format_string<Args...> fmt, Args &&...args) {
       __help_text.emplace(std::format(fmt, std::forward<Args>(args)...));
       return *this;
     }
-    template <is_arg_validator validator_type> arg &add_validator(validator_type &&v) {
-      std::unique_ptr<arg_validator<void>> new_vtor =
-        std::make_unique<arg_validator<validator_type>>(std::forward<validator_type>(v));
+    template <is_arg_validator ValidatorType> Arg &add_validator(ValidatorType &&v) {
+      std::unique_ptr<ArgValidator<void>> new_vtor =
+        std::make_unique<ArgValidator<ValidatorType>>(std::forward<ValidatorType>(v));
       auto new_vtor_id = new_vtor->id();
       if (new_vtor_id) {
         auto it =
-          std::ranges::find_if(__vtors, [&](const std::unique_ptr<arg_validator<void>> &vtor) {
+          std::ranges::find_if(__vtors, [&](const std::unique_ptr<ArgValidator<void>> &vtor) {
             auto vtor_id = vtor->id();
             return vtor_id && vtor_id.value() == new_vtor_id.value();
           });
@@ -354,28 +355,28 @@ namespace jowi::cli {
       return *this;
     }
     // shortcut build functions
-    arg &n_at_least(uint64_t min_size) {
-      return add_validator(arg_count_validator::at_least(min_size));
+    Arg &n_at_least(uint64_t min_size) {
+      return add_validator(ArgCountValidator::at_least(min_size));
     }
-    arg &n_at_most(uint64_t max_size) {
-      return add_validator(arg_count_validator::at_most(max_size));
+    Arg &n_at_most(uint64_t max_size) {
+      return add_validator(ArgCountValidator::at_most(max_size));
     }
-    arg &n_equal_to(uint64_t v) {
-      return add_validator(arg_count_validator::equal_to(v));
+    Arg &n_equal_to(uint64_t v) {
+      return add_validator(ArgCountValidator::equal_to(v));
     }
-    arg &n_range(uint64_t min_size, uint64_t max_size) {
-      return add_validator(arg_count_validator::range(min_size, max_size));
+    Arg &n_range(uint64_t min_size, uint64_t max_size) {
+      return add_validator(ArgCountValidator::range(min_size, max_size));
     }
-    arg &require_value() {
-      return add_validator(arg_empty_validator{false});
+    Arg &require_value() {
+      return add_validator(ArgEmptyValidator{false});
     }
-    arg &as_flag() {
-      return add_validator(arg_empty_validator{true});
+    Arg &as_flag() {
+      return add_validator(ArgEmptyValidator{true});
     }
-    arg &required() {
+    Arg &required() {
       return require_value().n_equal_to(1);
     }
-    arg &optional() {
+    Arg &optional() {
       return n_range(0, 1);
     }
 
@@ -386,28 +387,28 @@ namespace jowi::cli {
     bool empty() const noexcept {
       return __vtors.empty();
     }
-    arg move() noexcept {
+    Arg move() noexcept {
       return std::move(*this);
     }
 
     // Factory Functions
-    static arg positional() {
-      arg arg{};
+    static Arg positional() {
+      Arg arg{};
       arg.required();
       return arg;
     }
-    static arg flag() {
-      arg arg{};
+    static Arg flag() {
+      Arg arg{};
       arg.as_flag().optional();
       return arg;
     }
 
     // Arg Validator Implementation
-    ui::cli_nodes &help(ui::cli_nodes &nodes) const {
+    tui::CliNodes &help(tui::CliNodes &nodes) const {
       nodes.append_nodes(
         __help_text
-          ? ui::cli_nodes{ui::cli_node::text("{}", __help_text.value()), ui::cli_node::new_line()}
-          : ui::cli_nodes{}
+          ? tui::CliNodes{tui::CliNode::text("{}", __help_text.value()), tui::CliNode::new_line()}
+          : tui::CliNodes{}
       );
       for (const auto &vtor : __vtors) {
         vtor->help(nodes);
@@ -415,7 +416,7 @@ namespace jowi::cli {
       return nodes;
     }
 
-    std::expected<void, parse_error> validate(std::optional<std::string_view> value) const {
+    std::expected<void, ParseError> validate(std::optional<std::string_view> value) const {
       for (const auto &vtor : __vtors) {
         auto res = vtor->validate(value);
         if (!res) {
@@ -424,8 +425,8 @@ namespace jowi::cli {
       }
       return {};
     }
-    std::expected<void, parse_error> post_validate(
-      std::optional<std::reference_wrapper<const arg_key>> key, parsed_arg &args
+    std::expected<void, ParseError> post_validate(
+      std::optional<std::reference_wrapper<const ArgKey>> key, ParsedArg &args
     ) const {
       for (const auto &vtor : __vtors) {
         auto res = vtor->post_validate(key, args);

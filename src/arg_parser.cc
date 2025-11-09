@@ -13,23 +13,23 @@ import :arg;
 import :parse_error;
 
 namespace jowi::cli {
-  template <class T> using ref = std::reference_wrapper<T>;
+  template <class T> using Ref = std::reference_wrapper<T>;
 
-  struct arg_decl {
-    arg pos;
-    generic::key_vector<arg_key, arg> params;
+  struct ArgDecl {
+    Arg pos;
+    generic::key_vector<ArgKey, Arg> params;
 
-    arg_decl(arg pos) : pos{std::move(pos)}, params{} {}
+    ArgDecl(Arg pos) : pos{std::move(pos)}, params{} {}
 
-    std::expected<ref<parsed_arg>, parse_error> parse(
-      uint64_t pos_id, parsed_arg &args, bool parse_positional
+    std::expected<Ref<ParsedArg>, ParseError> parse(
+      uint64_t pos_id, ParsedArg &args, bool parse_positional
     ) const {
       auto opt_current_arg = args.raw();
       if (parse_positional && opt_current_arg.has_value()) {
         std::string_view current_arg = opt_current_arg.value();
-        if (arg_key::is_arg_key(current_arg)) {
-          return std::unexpected{parse_error{
-            parse_error_type::INVALID_VALUE,
+        if (ArgKey::is_arg_key(current_arg)) {
+          return std::unexpected{ParseError{
+            ParseErrorType::INVALID_VALUE,
             "arg{} - expected positional found keyword argument",
             pos_id
           }};
@@ -37,7 +37,7 @@ namespace jowi::cli {
         auto res = pos.validate(current_arg);
         if (!res) {
           return std::unexpected{
-            parse_error{res.error().err_type(), "arg{} - {}", pos_id, res.error().msg_only()}
+            ParseError{res.error().err_type(), "arg{} - {}", pos_id, res.error().msg_only()}
           };
         }
         args.add_argument(current_arg);
@@ -47,7 +47,7 @@ namespace jowi::cli {
       bool is_parser_run = true;
       while (is_parser_run && opt_current_arg.has_value()) {
         is_parser_run = false;
-        auto kv_res = arg_key::parse_arg(opt_current_arg.value());
+        auto kv_res = ArgKey::parse_arg(opt_current_arg.value());
         if (!kv_res) break;
         auto kv = std::move(kv_res.value());
         for (const auto &[k, arg] : params) {
@@ -55,15 +55,15 @@ namespace jowi::cli {
             is_parser_run = true;
             auto res = arg.validate(kv.second)
                          .or_else([&](auto &&e) {
-                           if (e.err_type() == parse_error_type::NO_VALUE_GIVEN) {
+                           if (e.err_type() == ParseErrorType::NO_VALUE_GIVEN) {
                              kv.second = args.next_raw();
                              return arg.validate(kv.second);
                            } else {
-                             return std::expected<void, parse_error>{std::unexpected{std::move(e)}};
+                             return std::expected<void, ParseError>{std::unexpected{std::move(e)}};
                            }
                          })
                          .transform_error([&](auto &&e) {
-                           return parse_error{e.err_type(), "{} - {}", k, e.msg_only()};
+                           return ParseError{e.err_type(), "{} - {}", k, e.msg_only()};
                          });
             if (!res) {
               return std::unexpected{std::move(res.error())};
@@ -80,7 +80,7 @@ namespace jowi::cli {
         auto res = arg.post_validate(std::cref(k), args);
         if (!res) {
           return std::unexpected{
-            parse_error{res.error().err_type(), "{} - {}", k, res.error().msg_only()}
+            ParseError{res.error().err_type(), "{} - {}", k, res.error().msg_only()}
           };
         }
       }
@@ -103,22 +103,22 @@ namespace jowi::cli {
     }
   };
 
-  export struct arg_parser {
+  export struct ArgParser {
   private:
-    std::vector<arg_decl> __args;
+    std::vector<ArgDecl> __args;
 
   public:
-    arg_parser() : __args{} {
+    ArgParser() : __args{} {
       add_argument().help("main executable");
     }
-    arg &add_argument(arg_key k, arg arg = arg::flag()) {
+    Arg &add_argument(ArgKey k, Arg arg = Arg::flag()) {
       return __args.back().params.emplace(k, std::move(arg));
     }
-    arg &add_argument(std::string_view k, arg arg = arg::flag()) {
-      return __args.back().params.emplace(arg_key::make(k).value(), std::move(arg));
+    Arg &add_argument(std::string_view k, Arg arg = Arg::flag()) {
+      return __args.back().params.emplace(ArgKey::make(k).value(), std::move(arg));
     }
-    arg &add_argument() {
-      __args.emplace_back(arg::positional());
+    Arg &add_argument() {
+      __args.emplace_back(Arg::positional());
       return __args.back().pos;
     }
 
@@ -144,7 +144,7 @@ namespace jowi::cli {
     /*
       Argument Parsing
     */
-    std::expected<ref<parsed_arg>, parse_error> parse(parsed_arg &args) const {
+    std::expected<Ref<ParsedArg>, ParseError> parse(ParsedArg &args) const {
       for (auto arg_id = std::max(0, static_cast<int>(args.size()) - 1); arg_id != size();
            arg_id += 1) {
         auto res = __args[arg_id].parse(arg_id, args, args.size() <= arg_id);
@@ -154,8 +154,8 @@ namespace jowi::cli {
       }
       return std::ref(args);
     }
-    std::expected<parsed_arg, parse_error> parse(raw_args raw) const {
-      parsed_arg args{raw};
+    std::expected<ParsedArg, ParseError> parse(RawArgs raw) const {
+      ParsedArg args{raw};
       return parse(args).transform([](auto &&args) { return std::move(args); });
     }
   };

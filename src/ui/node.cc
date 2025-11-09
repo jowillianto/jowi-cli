@@ -4,45 +4,45 @@ module;
 #include <format>
 #include <ranges>
 #include <vector>
-export module jowi.cli.ui:node;
+export module jowi.tui:node;
 import jowi.generic;
 import :color;
 import :text_format;
 
-namespace jowi::cli::ui {
+namespace jowi::tui {
 
-  enum struct valueless_node { format_end, new_line, text, format_start, indent };
+  enum struct ValuelessNode { format_end, new_line, text, format_start, indent };
 
-  struct indent_node {
+  struct IndentNode {
     std::uint8_t level;
 
-    constexpr bool operator==(const indent_node &) const = default;
+    constexpr bool operator==(const IndentNode &) const = default;
   };
 
-  constexpr std::array no_value_nodes = {valueless_node::format_end, valueless_node::new_line};
+  constexpr std::array no_value_nodes = {ValuelessNode::format_end, ValuelessNode::new_line};
 
-  export struct cli_node {
+  export struct CliNode {
   private:
-    using variant_type = generic::variant<valueless_node, text_format, std::string, indent_node>;
-    variant_type __value;
+    using VariantType = generic::variant<ValuelessNode, TextFormat, std::string, IndentNode>;
+    VariantType __value;
 
     template <typename... Args>
-    constexpr cli_node(Args &&...args)
-      requires std::constructible_from<variant_type, Args...>
+    constexpr CliNode(Args &&...args)
+      requires std::constructible_from<VariantType, Args...>
       : __value(std::forward<Args>(args)...) {}
 
   public:
-    template <valueless_node node_type> bool is() const {
+    template <ValuelessNode node_type> bool is() const {
       if constexpr (std::ranges::find(no_value_nodes, node_type) != no_value_nodes.end()) {
-        return __value.as<valueless_node>()
+        return __value.as<ValuelessNode>()
           .transform([](const auto &val) { return val == node_type; })
           .value_or(false);
-      } else if constexpr (node_type == valueless_node::text) {
+      } else if constexpr (node_type == ValuelessNode::text) {
         return __value.is<std::string>();
-      } else if constexpr (node_type == valueless_node::format_start) {
-        return __value.is<text_format>();
-      } else if constexpr (node_type == valueless_node::indent) {
-        return __value.is<indent_node>();
+      } else if constexpr (node_type == ValuelessNode::format_start) {
+        return __value.is<TextFormat>();
+      } else if constexpr (node_type == ValuelessNode::indent) {
+        return __value.is<IndentNode>();
       }
     }
 
@@ -53,54 +53,54 @@ namespace jowi::cli::ui {
       return __value.visit(std::forward<Args>(args)...);
     }
 
-    friend bool operator==(const cli_node &l, const cli_node &r) {
+    friend bool operator==(const CliNode &l, const CliNode &r) {
       return l.__value.visit([&](const auto &l) {
-        using l_type = std::decay_t<decltype(l)>;
+        using LType = std::decay_t<decltype(l)>;
         return r.__value.visit(
-          [&](const l_type &r) { return l == r; }, [](auto &&) { return false; }
+          [&](const LType &r) { return l == r; }, [](auto &&) { return false; }
         );
       });
     }
 
-    static cli_node new_line() noexcept {
-      return cli_node{valueless_node::new_line};
+    static CliNode new_line() noexcept {
+      return CliNode{ValuelessNode::new_line};
     }
-    static cli_node format_end() noexcept {
-      return cli_node{valueless_node::format_end};
+    static CliNode format_end() noexcept {
+      return CliNode{ValuelessNode::format_end};
     }
-    static cli_node indent(std::uint8_t indent) noexcept {
-      return cli_node{indent_node{indent}};
-    }
-    template <class... Args>
-    static cli_node text(std::format_string<Args...> fmt, Args &&...args) noexcept {
-      return cli_node{std::format(fmt, std::forward<Args>(args)...)};
+    static CliNode indent(std::uint8_t indent) noexcept {
+      return CliNode{IndentNode{indent}};
     }
     template <class... Args>
-    static cli_node vtext(std::string_view fmt, std::format_args args) noexcept {
-      return cli_node{std::vformat(fmt.data(), std::forward<std::format_args>(args))};
+    static CliNode text(std::format_string<Args...> fmt, Args &&...args) noexcept {
+      return CliNode{std::format(fmt, std::forward<Args>(args)...)};
     }
-    static cli_node format_begin(text_format fmt) {
-      return cli_node{std::move(fmt)};
+    template <class... Args>
+    static CliNode vtext(std::string_view fmt, std::format_args args) noexcept {
+      return CliNode{std::vformat(fmt.data(), std::forward<std::format_args>(args))};
+    }
+    static CliNode format_begin(TextFormat fmt) {
+      return CliNode{std::move(fmt)};
     }
   };
 
   template <class T>
-  concept is_cli_nodes_leaf = std::convertible_to<std::decay_t<T>, cli_node>;
+  concept is_cli_nodes_leaf = std::convertible_to<std::decay_t<T>, CliNode>;
   template <class T>
   concept is_cli_nodes_subtree =
-    std::ranges::range<T> && std::same_as<cli_node, std::decay_t<std::ranges::range_value_t<T>>>;
+    std::ranges::range<T> && std::same_as<CliNode, std::decay_t<std::ranges::range_value_t<T>>>;
 
   template <class T>
   concept is_cli_nodes_tree = is_cli_nodes_leaf<T> || is_cli_nodes_subtree<T>;
 
-  export struct cli_nodes {
+  export struct CliNodes {
   private:
-    std::vector<cli_node> __nodes;
+    std::vector<CliNode> __nodes;
     std::uint8_t __indent;
 
-    cli_nodes &__append_node(cli_node n) {
-      if (__nodes.empty() || __nodes.back().is<valueless_node::new_line>() && __indent != 0) {
-        __nodes.emplace_back(cli_node::indent(__indent));
+    CliNodes &__append_node(CliNode n) {
+      if (__nodes.empty() || __nodes.back().is<ValuelessNode::new_line>() && __indent != 0) {
+        __nodes.emplace_back(CliNode::indent(__indent));
       }
       __nodes.emplace_back(std::move(n));
       return *this;
@@ -109,15 +109,15 @@ namespace jowi::cli::ui {
   public:
     template <class... Args>
       requires(is_cli_nodes_tree<Args> && ...)
-    cli_nodes(std::uint8_t indent, Args &&...args) : __indent{indent}, __nodes{} {
+    CliNodes(std::uint8_t indent, Args &&...args) : __indent{indent}, __nodes{} {
       __nodes.reserve(sizeof...(Args));
       append_nodes(std::forward<Args>(args)...);
     }
     template <class... Args>
       requires(is_cli_nodes_tree<Args> && ...)
-    cli_nodes(Args &&...args) : cli_nodes(0, std::forward<Args>(args)...) {}
+    CliNodes(Args &&...args) : CliNodes(0, std::forward<Args>(args)...) {}
 
-    template <is_cli_nodes_tree T> cli_nodes &append_node(T &&v) {
+    template <is_cli_nodes_tree T> CliNodes &append_node(T &&v) {
       if constexpr (is_cli_nodes_leaf<T>) {
         return __append_node(std::forward<T>(v));
       } else {
@@ -137,7 +137,7 @@ namespace jowi::cli::ui {
 
     template <class... Args>
       requires(is_cli_nodes_tree<Args> && ...)
-    cli_nodes &append_nodes(Args &&...args) {
+    CliNodes &append_nodes(Args &&...args) {
       __nodes.reserve(__nodes.size() + sizeof...(args));
       (append_node(std::forward<Args>(args)), ...);
       return *this;
@@ -162,11 +162,11 @@ namespace jowi::cli::ui {
   };
 }
 
-template <class char_type> struct std::formatter<jowi::cli::ui::indent_node, char_type> {
+template <class CharType> struct std::formatter<jowi::tui::IndentNode, CharType> {
   constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
-  constexpr auto format(const jowi::cli::ui::indent_node &node, auto &ctx) const {
+  constexpr auto format(const jowi::tui::IndentNode &node, auto &ctx) const {
     for (std::uint8_t i = 0; i != node.level; i += 1) {
       std::format_to(ctx.out(), " ");
     }
@@ -174,16 +174,16 @@ template <class char_type> struct std::formatter<jowi::cli::ui::indent_node, cha
   }
 };
 
-template <class char_type> struct std::formatter<jowi::cli::ui::cli_node, char_type> {
+template <class CharType> struct std::formatter<jowi::tui::CliNode, CharType> {
   constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
-  constexpr auto format(const jowi::cli::ui::cli_node &n, auto &ctx) const {
+  constexpr auto format(const jowi::tui::CliNode &n, auto &ctx) const {
     n.visit(
-      [&](const jowi::cli::ui::valueless_node &n) {
-        if (n == jowi::cli::ui::valueless_node::new_line) {
+      [&](const jowi::tui::ValuelessNode &n) {
+        if (n == jowi::tui::ValuelessNode::new_line) {
           std::format_to(ctx.out(), "\n");
-        } else if (n == jowi::cli::ui::valueless_node::format_end) {
+        } else if (n == jowi::tui::ValuelessNode::format_end) {
           std::format_to(ctx.out(), "\x1b[0m");
         }
       },
@@ -193,12 +193,12 @@ template <class char_type> struct std::formatter<jowi::cli::ui::cli_node, char_t
   }
 };
 
-template <class char_type> struct std::formatter<jowi::cli::ui::cli_nodes, char_type> {
+template <class CharType> struct std::formatter<jowi::tui::CliNodes, CharType> {
   constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
 
-  auto format(const jowi::cli::ui::cli_nodes &nodes, auto &ctx) const {
+  auto format(const jowi::tui::CliNodes &nodes, auto &ctx) const {
     for (const auto &n : nodes) {
       std::format_to(ctx.out(), "{}", n);
     }

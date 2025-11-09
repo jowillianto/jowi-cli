@@ -3,10 +3,10 @@ module;
 #include <cstdint>
 #include <format>
 #include <variant>
-export module jowi.cli.ui:color;
+export module jowi.tui:color;
 
-namespace jowi::cli::ui {
-  enum struct basic_color {
+namespace jowi::tui {
+  enum struct BasicColor {
     black,
     red,
     green,
@@ -25,102 +25,102 @@ namespace jowi::cli::ui {
     bright_white
   };
 
-  struct indexed_color {
+  struct IndexedColor {
     std::uint8_t value;
 
-    constexpr bool operator==(const indexed_color &) const = default;
-    constexpr auto operator<=>(const indexed_color &) const = default;
+    constexpr bool operator==(const IndexedColor &) const = default;
+    constexpr auto operator<=>(const IndexedColor &) const = default;
   };
 
-  struct rgb_color {
+  struct RgbColor {
     std::uint8_t r;
     std::uint8_t g;
     std::uint8_t b;
 
-    constexpr bool operator==(const rgb_color &) const = default;
-    constexpr auto operator<=>(const rgb_color &) const = default;
+    constexpr bool operator==(const RgbColor &) const = default;
+    constexpr auto operator<=>(const RgbColor &) const = default;
   };
 
-  export class color {
+  export class Color {
   private:
-    using variant_type = std::variant<basic_color, indexed_color, rgb_color>;
-    variant_type __value;
+    using VariantType = std::variant<BasicColor, IndexedColor, RgbColor>;
+    VariantType __value;
 
     // Private constructor
     template <typename... Args>
-      requires std::constructible_from<variant_type, Args...>
-    constexpr color(Args &&...args) noexcept : __value(std::forward<Args>(args)...) {}
+      requires std::constructible_from<VariantType, Args...>
+    constexpr Color(Args &&...args) noexcept : __value(std::forward<Args>(args)...) {}
 
   public:
     // Factory functions for basic colors
-    static constexpr color black() noexcept {
-      return color{basic_color::black};
+    static constexpr Color black() noexcept {
+      return Color{BasicColor::black};
     }
-    static constexpr color red() noexcept {
-      return color{basic_color::red};
+    static constexpr Color red() noexcept {
+      return Color{BasicColor::red};
     }
-    static constexpr color green() noexcept {
-      return color{basic_color::green};
+    static constexpr Color green() noexcept {
+      return Color{BasicColor::green};
     }
-    static constexpr color yellow() noexcept {
-      return color{basic_color::yellow};
+    static constexpr Color yellow() noexcept {
+      return Color{BasicColor::yellow};
     }
-    static constexpr color blue() noexcept {
-      return color{basic_color::blue};
+    static constexpr Color blue() noexcept {
+      return Color{BasicColor::blue};
     }
-    static constexpr color magenta() noexcept {
-      return color{basic_color::magenta};
+    static constexpr Color magenta() noexcept {
+      return Color{BasicColor::magenta};
     }
-    static constexpr color cyan() noexcept {
-      return color{basic_color::cyan};
+    static constexpr Color cyan() noexcept {
+      return Color{BasicColor::cyan};
     }
-    static constexpr color white() noexcept {
-      return color{basic_color::white};
+    static constexpr Color white() noexcept {
+      return Color{BasicColor::white};
     }
 
     // Factory functions for bright variants
-    static constexpr color bright_black() noexcept {
-      return color{basic_color::bright_black};
+    static constexpr Color bright_black() noexcept {
+      return Color{BasicColor::bright_black};
     }
-    static constexpr color bright_red() noexcept {
-      return color{basic_color::bright_red};
+    static constexpr Color bright_red() noexcept {
+      return Color{BasicColor::bright_red};
     }
-    static constexpr color bright_green() noexcept {
-      return color{basic_color::bright_green};
+    static constexpr Color bright_green() noexcept {
+      return Color{BasicColor::bright_green};
     }
-    static constexpr color bright_yellow() noexcept {
-      return color{basic_color::bright_yellow};
+    static constexpr Color bright_yellow() noexcept {
+      return Color{BasicColor::bright_yellow};
     }
-    static constexpr color bright_blue() noexcept {
-      return color{basic_color::bright_blue};
+    static constexpr Color bright_blue() noexcept {
+      return Color{BasicColor::bright_blue};
     }
-    static constexpr color bright_magenta() noexcept {
-      return color{basic_color::bright_magenta};
+    static constexpr Color bright_magenta() noexcept {
+      return Color{BasicColor::bright_magenta};
     }
-    static constexpr color bright_cyan() noexcept {
-      return color{basic_color::bright_cyan};
+    static constexpr Color bright_cyan() noexcept {
+      return Color{BasicColor::bright_cyan};
     }
-    static constexpr color bright_white() noexcept {
-      return color{basic_color::bright_white};
-    }
-
-    static constexpr color indexed(std::uint8_t c) noexcept {
-      return color{indexed_color{c}};
+    static constexpr Color bright_white() noexcept {
+      return Color{BasicColor::bright_white};
     }
 
-    static constexpr color rgb(std::uint8_t r, std::uint8_t g, std::uint8_t b) noexcept {
-      return color{rgb_color{r, g, b}};
+    static constexpr Color indexed(std::uint8_t c) noexcept {
+      return Color{IndexedColor{c}};
+    }
+
+    static constexpr Color rgb(std::uint8_t r, std::uint8_t g, std::uint8_t b) noexcept {
+      return Color{RgbColor{r, g, b}};
     }
 
     // Comparison operators
-    constexpr bool operator==(const color &) const = default;
-    constexpr auto operator<=>(const color &) const = default;
+    constexpr bool operator==(const Color &) const = default;
+    constexpr auto operator<=>(const Color &) const = default;
 
     // Visit function instead of exposing variant
     template <typename F>
       requires(
-        std::invocable<F, basic_color> && std::invocable<F, indexed_color> &&
-        std::invocable<F, rgb_color>
+        std::invocable<F, BasicColor> && std::invocable<F, IndexedColor> &&
+        std::invocable<F, RgbColor>
       )
     constexpr auto visit(F &&f) const {
       return std::visit(std::forward<F>(f), __value);
@@ -128,56 +128,56 @@ namespace jowi::cli::ui {
   };
 }
 
-template <class char_type> struct std::formatter<jowi::cli::ui::color, char_type> {
+template <class CharType> struct std::formatter<jowi::tui::Color, CharType> {
   constexpr auto parse(auto &ctx) {
     return ctx.begin();
   }
 
-  auto format(const jowi::cli::ui::color &c, auto &ctx) const {
-    using jowi::cli::ui::basic_color;
-    using jowi::cli::ui::indexed_color;
-    using jowi::cli::ui::rgb_color;
+  auto format(const jowi::tui::Color &c, auto &ctx) const {
+    using jowi::tui::BasicColor;
+    using jowi::tui::IndexedColor;
+    using jowi::tui::RgbColor;
 
     c.visit([&ctx](const auto &variant) {
       using T = std::decay_t<decltype(variant)>;
-      if constexpr (std::same_as<T, basic_color>) {
+      if constexpr (std::same_as<T, BasicColor>) {
         switch (variant) {
-          case basic_color::black:
+          case BasicColor::black:
             return std::format_to(ctx.out(), "\x1b[30m");
-          case basic_color::red:
+          case BasicColor::red:
             return std::format_to(ctx.out(), "\x1b[31m");
-          case basic_color::green:
+          case BasicColor::green:
             return std::format_to(ctx.out(), "\x1b[32m");
-          case basic_color::yellow:
+          case BasicColor::yellow:
             return std::format_to(ctx.out(), "\x1b[33m");
-          case basic_color::blue:
+          case BasicColor::blue:
             return std::format_to(ctx.out(), "\x1b[34m");
-          case basic_color::magenta:
+          case BasicColor::magenta:
             return std::format_to(ctx.out(), "\x1b[35m");
-          case basic_color::cyan:
+          case BasicColor::cyan:
             return std::format_to(ctx.out(), "\x1b[36m");
-          case basic_color::white:
+          case BasicColor::white:
             return std::format_to(ctx.out(), "\x1b[37m");
-          case basic_color::bright_black:
+          case BasicColor::bright_black:
             return std::format_to(ctx.out(), "\x1b[90m");
-          case basic_color::bright_red:
+          case BasicColor::bright_red:
             return std::format_to(ctx.out(), "\x1b[91m");
-          case basic_color::bright_green:
+          case BasicColor::bright_green:
             return std::format_to(ctx.out(), "\x1b[92m");
-          case basic_color::bright_yellow:
+          case BasicColor::bright_yellow:
             return std::format_to(ctx.out(), "\x1b[93m");
-          case basic_color::bright_blue:
+          case BasicColor::bright_blue:
             return std::format_to(ctx.out(), "\x1b[94m");
-          case basic_color::bright_magenta:
+          case BasicColor::bright_magenta:
             return std::format_to(ctx.out(), "\x1b[95m");
-          case basic_color::bright_cyan:
+          case BasicColor::bright_cyan:
             return std::format_to(ctx.out(), "\x1b[96m");
-          case basic_color::bright_white:
+          case BasicColor::bright_white:
             return std::format_to(ctx.out(), "\x1b[97m");
         }
-      } else if constexpr (std::same_as<T, indexed_color>) {
+      } else if constexpr (std::same_as<T, IndexedColor>) {
         return std::format_to(ctx.out(), "\x1b[38;5;{}m", variant.value);
-      } else if constexpr (std::same_as<T, rgb_color>) {
+      } else if constexpr (std::same_as<T, RgbColor>) {
         return std::format_to(ctx.out(), "\x1b[38;2;{};{};{}m", variant.r, variant.g, variant.b);
       }
     });

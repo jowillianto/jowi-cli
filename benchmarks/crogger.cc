@@ -9,19 +9,19 @@ namespace crogger = jowi::crogger;
 namespace cli = jowi::cli;
 namespace test_lib = jowi::test_lib;
 
-auto crogger_id = cli::app_identity{.name = "Crogger Benchmarker"};
+auto crogger_id = cli::AppIdentity{.name = "Crogger Benchmarker"};
 
-crogger::logger create_logger(std::string_view formatter, std::string_view emitter) {
-  crogger::logger logger;
+crogger::Logger create_logger(std::string_view formatter, std::string_view emitter) {
+  crogger::Logger logger;
   if (formatter == "bw") {
-    logger.set_formatter(crogger::bw_formatter());
+    logger.set_formatter(crogger::BwFormatter());
   } else if (formatter == "empty") {
-    logger.set_formatter(crogger::empty_formatter{});
+    logger.set_formatter(crogger::EmptyFormatter{});
   } else if (formatter == "plain") {
-    logger.set_formatter(crogger::plain_formatter{});
+    logger.set_formatter(crogger::PlainFormatter{});
   }
   if (emitter == "empty") {
-    logger.set_emitter(crogger::empty_emitter{});
+    logger.set_emitter(crogger::EmptyEmitter{});
   }
   return logger;
 }
@@ -37,15 +37,15 @@ std::pair<std::invoke_result_t<F, Args...>, std::chrono::system_clock::duration>
   return std::pair{std::move(res), end - beg};
 }
 
-auto log_messages(const crogger::logger &logger, std::string_view msg, unsigned count) {
+auto log_messages(const crogger::Logger &logger, std::string_view msg, unsigned count) {
   for (size_t i = 0; i < count; i += 1) {
-    crogger::info(logger, crogger::message{"{} - {}", i, msg});
+    crogger::info(logger, crogger::Message{"{} - {}", i, msg});
   }
   return count;
 }
 
 int main(int argc, const char **argv) {
-  cli::app app{crogger_id, argc, argv};
+  cli::App app{crogger_id, argc, argv};
   app.add_argument("--count")
     .help("The Amount of Log Message to benchmark on")
     .require_value()
@@ -58,7 +58,7 @@ int main(int argc, const char **argv) {
     .help("The output emitter to use. The default is stdout")
     .require_value()
     .add_validator(
-      cli::arg_options_validator{}
+      cli::ArgOptionsValidator{}
         .add_option("stdout", "emit logs to stdout")
         .add_option("empty", "do not emit anywhere")
         .move()
@@ -69,7 +69,7 @@ int main(int argc, const char **argv) {
     .require_value()
     .optional()
     .add_validator(
-      cli::arg_options_validator{}
+      cli::ArgOptionsValidator{}
         .add_option("empty", "no format")
         .add_option("bw", "black and white formatting with date and formatted severity")
         .add_option("color", "colorful formatting with date and formatted severity")
@@ -88,13 +88,13 @@ int main(int argc, const char **argv) {
   auto emitter =
     app.args().first_of("--emit").transform(cli::parse_arg<std::string>).value_or("stdout");
   auto rnd_msg = test_lib::random_string(log_msg_length);
-  crogger::warn(crogger::message{"Begin: Logger Init"});
+  crogger::warn(crogger::Message{"Begin: Logger Init"});
   auto [logger, logger_init_time] = invoke_bench(create_logger, formatter, emitter);
-  crogger::warn(crogger::message{"End: Logger Init ({})", logger_init_time});
-  crogger::warn(crogger::message{"Begin: Log Message"});
+  crogger::warn(crogger::Message{"End: Logger Init ({})", logger_init_time});
+  crogger::warn(crogger::Message{"Begin: Log Message"});
   auto [log_count, logger_log_time] = invoke_bench(log_messages, logger, rnd_msg, count);
   crogger::warn(
-    crogger::message{
+    crogger::Message{
       "End: Log Message ({})",
       std::chrono::duration_cast<std::chrono::milliseconds>(logger_log_time)
     }
