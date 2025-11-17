@@ -115,9 +115,8 @@ namespace jowi::tui {
     std::string text;
     bool new_line = true;
 
-    template <class... Args>
-      requires std::constructible_from<std::string, Args...>
-    Paragraph(Args &&...args) : text(std::forward<Args>(args)...) {}
+    Paragraph(): text{} {}
+    Paragraph(std::string text) : text(std::move(text)) {}
 
     template <class... Args>
       requires(std::formattable<Args, char> && ...)
