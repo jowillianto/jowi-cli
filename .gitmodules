@@ -4,6 +4,3 @@
 [submodule "libs/test-lib"]
 	path = libs/test-lib
 	url = https://github.com/jowillianto/test-lib
-[submodule "libs/reflect-cpp"]
-	path = libs/reflect-cpp
-	url = https://github.com/getml/reflect-cpp
