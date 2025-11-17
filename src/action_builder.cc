@@ -1,10 +1,13 @@
 module;
 #include <cstdlib>
 #include <functional>
+#include <optional>
 #include <string>
 export module jowi.cli:action_builder;
 import jowi.generic;
 import :app;
+import jowi.tui;
+namespace tui = jowi::tui;
 
 namespace jowi::cli {
   struct AppAction {
@@ -59,7 +62,8 @@ namespace jowi::cli {
       app.parse_args(false);
       if (app.args().size() - 1 != __id) {
         if (app.args().contains("-h") || app.args().contains("--help")) {
-          app.out(0, "{}", app.help());
+          app.print_help();
+          std::exit(0);
         }
         app.error(1, "arg{}: {}", __id, ParseErrorType::NO_VALUE_GIVEN);
       }

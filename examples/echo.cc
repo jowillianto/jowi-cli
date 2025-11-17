@@ -1,4 +1,5 @@
 #include <format>
+#include <print>
 import jowi.cli;
 
 namespace cli = jowi::cli;
@@ -15,5 +16,5 @@ int main(int argc, const char **argv) {
   app.add_argument("--echo").required();
   app.parse_args();
 
-  app.out("{}", app.args().first_of("--echo").value());
+  std::println("{}", app.args().first_of("--echo").value());
 }

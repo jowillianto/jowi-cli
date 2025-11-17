@@ -56,29 +56,29 @@ namespace jowi::crogger {
   };
 
   export struct ColorfulFormatter {
-    tui::TextFormat get_level_color(unsigned int lvl) const noexcept {
-      if (lvl < 10) return tui::TextFormat{}.fg(tui::Color::cyan());
-      else if (lvl < 20)
-        return tui::TextFormat{}.fg(tui::Color::blue());
-      else if (lvl < 30)
-        return tui::TextFormat{}.fg(tui::Color::green());
-      else if (lvl < 40)
-        return tui::TextFormat{}.fg(tui::Color::yellow());
-      else if (lvl < 50)
-        return tui::TextFormat{}.fg(tui::Color::magenta());
-      else
-        return tui::TextFormat{}.fg(tui::Color::red());
+    tui::RgbColor get_level_color(unsigned int lvl) const noexcept {
+      if (lvl < 10) return tui::RgbColor::cyan();
+      if (lvl < 20) return tui::RgbColor::blue();
+      if (lvl < 30) return tui::RgbColor::green();
+      if (lvl < 40) return tui::RgbColor::yellow();
+      if (lvl < 50) return tui::RgbColor::magenta();
+      return tui::RgbColor::red();
     }
     std::expected<void, LogError> format(
       const Context &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
     ) const {
-      std::format_to(
+
+      tui::AnsiFormatter<std::decay_t<decltype(it)>>::render(
+        tui::Layout{}
+          .append_child(
+            tui::Layout{}
+              .style(tui::DomStyle{}.fg(get_level_color(ctx.status.level)))
+              .append_child(tui::Paragraph("[{}]", ctx.status.name).no_newline())
+          )
+          .append_child(tui::Paragraph(" {:%FT%TZ} ", ctx.time).no_newline()),
         it,
-        "{}[{}]{} {:%FT%TZ} ",
-        tui::CliNode::format_begin(get_level_color(ctx.status.level)),
-        ctx.status.name,
-        tui::CliNode::format_end(),
-        ctx.time
+        0,
+        std::nullopt
       );
       ctx.message.format(it);
       it = '\n';

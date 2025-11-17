@@ -3,7 +3,6 @@ import jowi.tui;
 #include <filesystem>
 #include <fstream>
 #include <print>
-#include <ranges>
 
 namespace cli = jowi::cli;
 namespace tui = jowi::tui;
@@ -35,28 +34,22 @@ int main(int argc, const char **argv) {
   std::string line;
   bool is_first_line = true;
   while (std::getline(csv_file, line, '\n')) {
-    auto comma_sep =
-      std::views::split(line, ',') |
-      std::views::transform([](auto &&s) {
-        return tui::CliNode::text("{}", std::string_view{s.begin(), s.end()});
-      });
+    auto render_line = [&](tui::DomStyle style) {
+      auto layout = tui::Layout{};
+      layout.style(std::move(style));
+      layout.append_child(tui::DomNode::paragraph(line));
+      static_cast<void>(tui::out_terminal.render(tui::DomNode::vstack(std::move(layout))));
+    };
+
     if (is_first_line && headers) {
-      app.out(
-        "{}",
-        tui::CliNodes{
-          tui::CliNode::format_begin(
-            tui::TextFormat{}
-              .effect(tui::TextEffect::bold)
-              .effect(tui::TextEffect::underline)
-              .fg(tui::Color::bright_blue())
-          ),
-          comma_sep,
-          tui::CliNode::format_end()
-        }
+      render_line(
+        tui::DomStyle{}.effect(tui::TextEffect::BOLD)
+          .effect(tui::TextEffect::UNDERLINE)
+          .fg(tui::RgbColor::bright_blue())
       );
       is_first_line = false;
     } else {
-      app.out("{}", tui::CliNodes{comma_sep});
+      render_line(tui::DomStyle{});
     }
   }
 }

@@ -1,9 +1,10 @@
 module;
+#include <algorithm>
 #include <cstdlib>
 #include <expected>
 #include <format>
+#include <iterator>
 #include <print>
-#include <ranges>
 #include <source_location>
 #include <string>
 #include <string_view>
@@ -26,12 +27,8 @@ namespace jowi::cli {
 
   public:
     AppIdentity id;
-    tui::TextFormat err_fmt;
-    tui::TextFormat help_fmt;
     App(AppIdentity id, int argc, const char **argv, const char **envp = nullptr) :
-      __args{RawArgs{argc, argv}}, __parser{}, id{std::move(id)},
-      err_fmt{tui::TextFormat{}.fg(tui::Color::red())},
-      help_fmt{tui::TextFormat{}.fg(tui::Color::green())} {
+      __args{RawArgs{argc, argv}}, __parser{}, id{std::move(id)} {
       add_help_argument();
     }
 
@@ -62,55 +59,69 @@ namespace jowi::cli {
     /*
       Formatting with Error and Help
     */
-    tui::CliNodes help() const {
-      auto nodes = tui::CliNodes{};
-      // Print the identity
-      nodes.append_nodes(
-        tui::CliNode::text("{} v{}", id.name, id.version),
-        tui::CliNode::new_line(),
-        id.description.length() != 0
-          ? tui::CliNodes{tui::CliNode::text("{}", id.description), tui::CliNode::new_line()}
-          : tui::CliNodes{},
-        id.author
-          ? tui::CliNodes{tui::CliNode::text("By {}", id.author.value()), tui::CliNode::new_line()}
-          : tui::CliNodes{},
-        id.license
-          ? tui::
-              CliNodes{tui::CliNode::text("License: {}", id.license.value()), tui::CliNode::new_line()}
-          : tui::CliNodes{},
-        tui::CliNode::new_line(),
-        std::ranges::transform_view{
-          args(), [](auto &&arg) { return tui::CliNode::text("{} ", arg.value); }
-        },
-        args().size() == 0 ? tui::CliNodes{} : tui::CliNodes{tui::CliNode::new_line()},
-        tui::CliNode::format_begin(help_fmt)
-      );
+    tui::DomNode help_dom() const {
+      auto layout =
+        tui::Layout{}.style(help_style).append_child(tui::Paragraph("{} v{}", id.name, id.version));
+      if (!id.description.empty()) {
+        layout.append_child(tui::Paragraph(id.description));
+      }
+      if (id.author) {
+        layout.append_child(tui::Paragraph("By {}", id.author.value()));
+      }
+      if (id.license) {
+        layout.append_child(tui::Paragraph("License: {}", id.license.value()));
+      }
+      layout.append_child(tui::Paragraph(""));
+      if (!args().empty()) {
+        std::string parsed_args;
+        for (const auto &arg_value : args()) {
+          parsed_args.append(arg_value.value);
+          parsed_args.push_back(' ');
+        }
+        if (!parsed_args.empty()) {
+          layout.append_child(tui::Paragraph(parsed_args));
+          layout.append_child(tui::Paragraph(""));
+        }
+      }
       uint64_t start_id = std::max(0, static_cast<int>(args().size()) - 1);
       for (auto arg = __parser.begin() + start_id; arg != __parser.end(); arg += 1) {
         uint64_t cur_arg_id = std::distance(__parser.begin(), arg);
         bool print_cur_pos = cur_arg_id > start_id;
-        auto sub_nodes = tui::CliNodes{
-          print_cur_pos ? static_cast<std::uint8_t>(2) : static_cast<std::uint8_t>(0)
-        };
+        auto section = tui::Layout{}.style(tui::DomStyle{}.indent(2));
         if (print_cur_pos) {
-          nodes.append_nodes(tui::CliNode::text("arg{}", cur_arg_id), tui::CliNode::new_line());
-          arg->pos.help(sub_nodes);
+          section.append_child(tui::Paragraph("arg{}", cur_arg_id));
+          if (auto node = arg->pos.help()) {
+            auto detail = tui::Layout{}.style(tui::DomStyle{}.indent(2));
+            detail.append_child(std::move(node.value()));
+            section.append_child(tui::DomNode::vstack(std::move(detail)));
+          }
         }
-        sub_nodes.append_nodes(
-          !(arg->empty())
-            ? tui::CliNodes{tui::CliNode::text("Keyword Arguments: "), tui::CliNode::new_line()}
-            : tui::CliNodes{}
-        );
-        for (const auto &[k, arg] : (*arg)) {
-          sub_nodes.append_nodes(tui::CliNode::text("{}: ", k), tui::CliNode::new_line());
-          auto sub_sub_nodes = tui::CliNodes{2};
-          arg.help(sub_sub_nodes);
-          sub_nodes.append_nodes(std::move(sub_sub_nodes));
+        if (!arg->empty()) {
+          section.append_child(tui::Paragraph("Keyword Arguments:"));
+          auto keyword_layout = tui::Layout{}.style(tui::DomStyle{}.indent(2));
+          for (const auto &[k, validator_arg] : (*arg)) {
+            auto entry = tui::Layout{};
+            entry.append_child(tui::Paragraph("{}:", k));
+            if (auto validator_help = validator_arg.help()) {
+              auto validator_layout = tui::Layout{}.style(tui::DomStyle{}.indent(2));
+              validator_layout.append_child(std::move(validator_help.value()));
+              entry.append_child(tui::DomNode::vstack(std::move(validator_layout)));
+            } else {
+              entry.append_child(tui::Paragraph("<no help>"));
+            }
+            keyword_layout.append_child(tui::DomNode::vstack(std::move(entry)));
+          }
+          section.append_child(tui::DomNode::vstack(std::move(keyword_layout)));
         }
-        nodes.append_nodes(std::move(sub_nodes));
+        layout.append_child(tui::DomNode::vstack(std::move(section)));
+        layout.append_child(tui::Paragraph(""));
       }
-      nodes.append_nodes(tui::CliNode::format_end());
-      return nodes;
+      return tui::DomNode::vstack(std::move(layout));
+    }
+
+    void print_help() const {
+      tui::out_terminal.render(help_dom());
+      std::exit(0);
     }
 
     void add_help_argument() {
@@ -128,8 +139,7 @@ namespace jowi::cli {
       auto res = __parser.parse(__args);
       auto help_arg_count = __args.count("-h") + __args.count("--help");
       if (help_arg_count != 0 && auto_help) {
-        std::println("{}", help());
-        std::exit(0);
+        print_help();
       }
       if (!res && auto_exit) {
         error(1, "{}", res.error().what());
@@ -143,7 +153,7 @@ namespace jowi::cli {
       class T,
       std::convertible_to<generic::ErrorFormatter> E,
       std::invocable<generic::ErrorFormatter> F>
-    T expect_or(std::expected<T, E> &&res, F &&f) const {
+    static T expect_or(std::expected<T, E> &&res, F &&f) {
       if (!res) {
         std::invoke(f, generic::ErrorFormatter{res.error()});
         std::exit(1);
@@ -156,27 +166,24 @@ namespace jowi::cli {
 
     template <class T, std::convertible_to<generic::ErrorFormatter> E, class... Args>
       requires(std::formattable<Args, char> && ...)
-    T expect(
+    static T expect(
       std::expected<T, E> &&res,
       std::format_string<generic::ErrorFormatter &, Args...> fmt,
       Args &&...args
-    ) const {
+    ) {
       return expect_or(std::forward<std::expected<T, E> &&>(res), [&](generic::ErrorFormatter e) {
-        error(
-          1,
-          "{}",
-          tui::CliNodes{
-            tui::CliNode::format_begin(err_fmt),
-            tui::CliNode::text(fmt, e, std::forward<Args>(args)...),
-            tui::CliNode::format_end()
-          }
+        tui::err_terminal.render(
+          tui::Layout{}
+            .style(error_style)
+            .append_child(tui::Paragraph(fmt, e, std::forward<Args>(args)...))
         );
+        std::exit(1);
       });
     }
     template <class T, class E>
-    T expect(
+    static T expect(
       std::expected<T, E> &&res, std::source_location loc = std::source_location::current()
-    ) const {
+    ) {
       return expect(
         std::forward<std::expected<T, E> &&>(res),
         "{1:} line {2:}: {0:}",
@@ -185,28 +192,16 @@ namespace jowi::cli {
       );
     }
     template <class... Args>
-    void error(int ret_code, std::format_string<Args...> fmt, Args &&...args) const {
-      std::println(
-        stderr,
-        "{}",
-        tui::CliNodes{
-          tui::CliNode::format_begin(err_fmt),
-          tui::CliNode::text(fmt, std::forward<Args>(args)...),
-          tui::CliNode::format_end()
-        }
+    static void error(int ret_code, std::format_string<Args...> fmt, Args &&...args) {
+      tui::err_terminal.render(
+        tui::Layout{}
+          .style(error_style)
+          .append_child(tui::Paragraph(fmt, std::forward<Args>(args)...))
       );
       std::exit(ret_code);
     }
-    template <class... Args> void out(std::format_string<Args...> fmt, Args &&...args) const {
-      std::println(fmt, std::forward<Args>(args)...);
-    }
-    template <class... Args>
-    void out(int ret_code, std::format_string<Args...> fmt, Args &&...args) const {
-      std::println(fmt, std::forward<Args>(args)...);
-      std::exit(ret_code);
-    }
-    template <class... Args> void warn(std::format_string<Args...> fmt, Args &&...args) const {
-      std::println(stderr, fmt, std::forward<Args>(args)...);
-    }
+
+    inline static tui::DomStyle error_style = tui::DomStyle{}.fg(tui::RgbColor::bright_yellow());
+    inline static tui::DomStyle help_style = tui::DomStyle{}.fg(tui::RgbColor::bright_green());
   };
 }

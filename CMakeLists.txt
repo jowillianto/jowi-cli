@@ -12,21 +12,6 @@ if (NOT TARGET jowi::generic)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/jowi-generic)
 endif()
 
-add_library(jowi_tui)
-add_library(jowi::tui ALIAS jowi_tui)
-target_sources(jowi_tui
-  PUBLIC
-    FILE_SET CXX_MODULES
-      FILES
-        "${CMAKE_CURRENT_LIST_DIR}/src/ui/color.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/ui/main.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/ui/node.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/ui/renderer.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/ui/text_format.cc"
-)
-target_link_libraries(jowi_tui PUBLIC jowi::generic)
-target_compile_features(jowi_tui PUBLIC cxx_std_23)
-
 add_library(${PROJECT_NAME})
 add_library(jowi::cli ALIAS ${PROJECT_NAME})
 target_sources(${PROJECT_NAME}
@@ -46,8 +31,9 @@ target_sources(${PROJECT_NAME}
         "${CMAKE_CURRENT_LIST_DIR}/src/parse_error.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/parsed_arg.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/raw_args.cc"
+        "${CMAKE_CURRENT_LIST_DIR}/src/tui.cc"
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC jowi::generic jowi::tui)
+target_link_libraries(${PROJECT_NAME} PUBLIC jowi::generic)
 target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
 
 add_library(jowi_crogger)
@@ -65,7 +51,7 @@ target_sources(jowi_crogger
         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/emitter.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/main.cc"
 )
-target_link_libraries(jowi_crogger PUBLIC jowi::generic jowi::tui)
+target_link_libraries(jowi_crogger PUBLIC jowi::generic jowi::cli)
 target_compile_features(jowi_crogger PUBLIC cxx_std_23)
 
 if (JOWI_CLI_BUILD_TESTS)
@@ -126,8 +112,8 @@ if (JOWI_CLI_BUILD_EXAMPLES)
     target_link_libraries(${PROJECT_NAME}_example_actions PUBLIC jowi::cli)
 
     add_executable("${PROJECT_NAME}_example_ui" "${CMAKE_CURRENT_LIST_DIR}/examples/ui.cc")
-    target_link_libraries(${PROJECT_NAME}_example_ui PUBLIC jowi::cli jowi::tui)
+    target_link_libraries(${PROJECT_NAME}_example_ui PUBLIC jowi::cli)
 
     add_executable("${PROJECT_NAME}_example_csv" "${CMAKE_CURRENT_LIST_DIR}/examples/csv.cc")
-    target_link_libraries(${PROJECT_NAME}_example_csv PUBLIC jowi::cli jowi::tui)
+    target_link_libraries(${PROJECT_NAME}_example_csv PUBLIC jowi::cli)
 endif()

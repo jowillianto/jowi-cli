@@ -1,4 +1,5 @@
 #include <format>
+#include <print>
 import jowi.cli;
 
 namespace cli = jowi::cli;
@@ -19,7 +20,7 @@ int main(int argc, const char **argv) {
       [](cli::App &app) {
         app.add_argument("--echo").help("The argument to echo").required();
         app.parse_args();
-        app.out("{}", app.args().first_of("--echo").value());
+        std::println("{}", app.args().first_of("--echo").value());
       }
     )
     .add_action(
@@ -29,7 +30,7 @@ int main(int argc, const char **argv) {
         app.add_argument("--port").help("The port number to use").required();
         app.parse_args();
         int port = app.expect(app.args().first_of("--port").transform(cli::parse_arg<int>).value());
-        app.out("Port: {}", port);
+        std::println("Port: {}", port);
       }
     )
     .run();

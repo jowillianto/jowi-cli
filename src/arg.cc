@@ -23,8 +23,8 @@ namespace jowi::cli {
   };
 
   export template <class T>
-  concept help_providing_arg_validator = requires(const std::decay_t<T> t, tui::CliNodes &a) {
-    { t.help(a) } -> std::same_as<tui::CliNodes &>;
+  concept help_providing_arg_validator = requires(const std::decay_t<T> t) {
+    { t.help() } -> std::same_as<std::optional<tui::DomNode>>;
   };
 
   export template <class T>
@@ -35,9 +35,7 @@ namespace jowi::cli {
 
   export template <class T>
   concept post_validate_arg_validator = requires(
-    const std::decay_t<T> t,
-    std::optional<std::reference_wrapper<const ArgKey>> key,
-    ParsedArg &pa
+    const std::decay_t<T> t, std::optional<std::reference_wrapper<const ArgKey>> key, ParsedArg &pa
   ) {
     { t.post_validate(key, pa) } -> std::same_as<std::expected<void, ParseError>>;
   };
@@ -53,7 +51,7 @@ namespace jowi::cli {
 
   template <> struct ArgValidator<void> {
     virtual std::optional<std::string> id() const = 0;
-    virtual tui::CliNodes &help(tui::CliNodes &nodes) const = 0;
+    virtual std::optional<tui::DomNode> help() const = 0;
     virtual std::expected<void, ParseError> validate(
       std::optional<std::string_view> value
     ) const = 0;
@@ -73,16 +71,14 @@ namespace jowi::cli {
         return std::nullopt;
       }
     }
-    tui::CliNodes &help(tui::CliNodes &nodes) const override {
+    std::optional<tui::DomNode> help() const override {
       if constexpr (help_providing_arg_validator<ValidatorType>) {
-        return ValidatorType::help(nodes);
+        return ValidatorType::help();
       } else {
-        return nodes;
+        return std::nullopt;
       }
     }
-    std::expected<void, ParseError> validate(
-      std::optional<std::string_view> value
-    ) const override {
+    std::expected<void, ParseError> validate(std::optional<std::string_view> value) const override {
       if constexpr (value_arg_validator<ValidatorType>) {
         return ValidatorType::validate(value);
       } else {
@@ -183,26 +179,21 @@ namespace jowi::cli {
     std::optional<std::string> id() const {
       return "arg_options";
     }
-    tui::CliNodes &help(tui::CliNodes &nodes) const {
+    std::optional<tui::DomNode> help() const {
       if (empty()) {
-        return nodes;
+        return std::nullopt;
       }
-
-      nodes.append_nodes(tui::CliNode::text("Options: "), tui::CliNode::new_line());
+      auto layout = tui::Layout{};
+      layout.append_child(tui::DomNode::paragraph("Options:"));
+      auto entries = tui::Layout{}.style(tui::DomStyle{}.indent(2));
       for (const auto &option : __options) {
         auto help_text = option.help_text();
-        if (help_text) {
-          nodes.append_nodes(
-            tui::CliNode::text("- {}: {}", option.value(), help_text.value()),
-            tui::CliNode::new_line()
-          );
-        } else {
-          nodes.append_nodes(
-            tui::CliNode::text("- {}: <no-help>", option.value()), tui::CliNode::new_line()
-          );
-        }
+        auto text = help_text ? std::format("- {}: {}", option.value(), help_text.value())
+                              : std::format("- {}: <no-help>", option.value());
+        entries.append_child(tui::DomNode::paragraph(std::move(text)));
       }
-      return nodes;
+      layout.append_child(tui::DomNode::vstack(std::move(entries)));
+      return tui::DomNode::vstack(std::move(layout));
     }
 
     std::expected<void, ParseError> validate(std::optional<std::string_view> value) const {
@@ -249,26 +240,22 @@ namespace jowi::cli {
     std::optional<std::string> id() const {
       return "ArgCountValidator";
     }
-    tui::CliNodes &help(tui::CliNodes &nodes) const {
+    std::optional<tui::DomNode> help() const {
+      std::string desc;
       if (min_size == max_size && min_size != 1) {
-        nodes.append_nodes(
-          tui::CliNode::text("Arg Count: ={}", min_size), tui::CliNode::new_line()
-        );
+        desc = std::format("Arg Count: ={}", min_size);
       } else if (min_size == 0 && max_size == 1) {
-        nodes.append_nodes(tui::CliNode::text("Optional"), tui::CliNode::new_line());
+        desc = "Optional";
       } else if (min_size == 1 && max_size == 1) {
-        nodes.append_nodes(tui::CliNode::text("Required"), tui::CliNode::new_line());
-      } else if (min_size == 1 && max_size == -1) {
-        nodes.append_nodes(
-          tui::CliNode::text("Arg Count: >= {}", min_size), tui::CliNode::new_line()
-        );
+        desc = "Required";
+      } else if (min_size == 1 && max_size == static_cast<uint64_t>(-1)) {
+        desc = std::format("Arg Count: >= {}", min_size);
       } else {
-        nodes.append_nodes(
-          tui::CliNode::text("Arg Count: {} <= n <= {}", min_size, max_size),
-          tui::CliNode::new_line()
-        );
+        desc = std::format("Arg Count: {} <= n <= {}", min_size, max_size);
       }
-      return nodes;
+      auto layout = tui::Layout{};
+      layout.append_child(tui::DomNode::paragraph(std::move(desc)));
+      return tui::DomNode::vstack(std::move(layout));
     }
     std::expected<void, ParseError> post_validate(
       std::optional<std::reference_wrapper<const ArgKey>> key, ParsedArg &args
@@ -298,11 +285,13 @@ namespace jowi::cli {
     std::optional<std::string> id() const {
       return "ArgEmptyValidator";
     }
-    tui::CliNodes &help(tui::CliNodes &nodes) const {
-      if (__allow) {
-        nodes.append_nodes(tui::CliNode::text("Flag"), tui::CliNode::new_line());
+    std::optional<tui::DomNode> help() const {
+      if (!__allow) {
+        return std::nullopt;
       }
-      return nodes;
+      auto layout = tui::Layout{};
+      layout.append_child(tui::DomNode::paragraph("Flag"));
+      return tui::DomNode::vstack(std::move(layout));
     }
     std::expected<void, ParseError> validate(std::optional<std::string_view> value) const {
       if (!__allow && !value) {
@@ -404,16 +393,23 @@ namespace jowi::cli {
     }
 
     // Arg Validator Implementation
-    tui::CliNodes &help(tui::CliNodes &nodes) const {
-      nodes.append_nodes(
-        __help_text
-          ? tui::CliNodes{tui::CliNode::text("{}", __help_text.value()), tui::CliNode::new_line()}
-          : tui::CliNodes{}
-      );
-      for (const auto &vtor : __vtors) {
-        vtor->help(nodes);
+    std::optional<tui::DomNode> help() const {
+      bool has_content = false;
+      auto layout = tui::Layout{};
+      if (__help_text) {
+        layout.append_child(tui::DomNode::paragraph(__help_text.value()));
+        has_content = true;
       }
-      return nodes;
+      for (const auto &vtor : __vtors) {
+        if (auto node = vtor->help()) {
+          layout.append_child(std::move(node.value()));
+          has_content = true;
+        }
+      }
+      if (!has_content) {
+        return std::nullopt;
+      }
+      return tui::DomNode::vstack(std::move(layout));
     }
 
     std::expected<void, ParseError> validate(std::optional<std::string_view> value) const {
