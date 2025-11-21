@@ -3,8 +3,8 @@ module;
 #include <format>
 #include <source_location>
 #include <string_view>
-export module jowi.crogger:context;
-import :severity;
+export module jowi.crogger:log_context;
+import :log_level;
 import :emitter;
 
 namespace jowi::crogger {
@@ -33,32 +33,12 @@ namespace jowi::crogger {
   };
 
   /*
-    this should mirror Message.
-  */
-  export template <typename... Args> struct Msg : public RawMessage {
-  private:
-    std::string_view __fmt;
-    std::tuple<Args...> __args;
-
-  public:
-    Msg(std::format_string<Args...> fmt, Args... arguments) :
-      __fmt(fmt.get()), __args(std::forward<Args>(arguments)...) {}
-
-    void format(std::back_insert_iterator<StreamEmitter<void>> &it) const override {
-      std::apply(
-        [&](const auto &...args) { std::vformat_to(it, __fmt, std::make_format_args(args...)); },
-        __args
-      );
-    }
-  };
-
-  /*
     Context
     contains the logging Context, but this object should be consumed immediately after creation.
     This object should not be stored.
   */
-  export struct Context {
-    Severity status;
+  export struct LogContext {
+    LogLevel status;
     std::source_location loc;
     std::chrono::system_clock::time_point time;
     const RawMessage &message;

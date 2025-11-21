@@ -3,7 +3,7 @@ module;
 #include <expected>
 #include <filesystem>
 #include <memory>
-#include <print>
+#include <string>
 #include <string_view>
 export module jowi.crogger:emitter;
 import :error;
@@ -11,12 +11,12 @@ import :error;
 namespace jowi::crogger {
   namespace fs = std::filesystem;
   export template <class T>
-  concept is_emitter = requires(const T Emitter, std::string_view data) {
+  concept IsEmitter = requires(const T Emitter, std::string_view data) {
     { Emitter.emit(data) } -> std::same_as<std::expected<void, LogError>>;
   };
 
   export template <class T>
-  concept is_stream_emitter = requires(T Emitter, char x) {
+  concept IsStreamEmitter = requires(T Emitter, char x) {
     { Emitter.push_back(x) } -> std::same_as<void>;
     { Emitter.flush() } -> std::same_as<std::expected<void, LogError>>;
   };
@@ -28,20 +28,20 @@ namespace jowi::crogger {
     virtual std::expected<void, LogError> emit(std::string_view) const = 0;
     virtual ~Emitter() = default;
 
-    template <is_emitter EmitterType, class... Args>
+    template <IsEmitter EmitterType, class... Args>
       requires(std::constructible_from<EmitterType, Args...>)
     static std::unique_ptr<Emitter<void>> make_unique(Args &&...args) {
       return std::make_unique<Emitter<EmitterType>>(std::forward<Args>(args)...);
     }
 
-    template <is_emitter EmitterType, class... Args>
+    template <IsEmitter EmitterType, class... Args>
       requires(std::constructible_from<EmitterType, Args...>)
     static std::shared_ptr<Emitter<void>> make_shared(Args &&...args) {
       return std::make_shared<Emitter<EmitterType>>(std::forward<Args>(args)...);
     }
   };
 
-  export template <is_emitter T> struct Emitter<T> : private T, public Emitter<void> {
+  export template <IsEmitter T> struct Emitter<T> : private T, public Emitter<void> {
     using T::T;
 
     Emitter(T &&v)
@@ -58,20 +58,20 @@ namespace jowi::crogger {
     virtual std::expected<void, LogError> flush() = 0;
     virtual ~StreamEmitter() = default;
 
-    template <is_stream_emitter EmitterType, class... Args>
+    template <IsStreamEmitter EmitterType, class... Args>
       requires(std::constructible_from<EmitterType, Args...>)
     std::unique_ptr<StreamEmitter<void>> make_unique(Args &&...args) {
       return std::make_unique<StreamEmitter<EmitterType>>(std::forward<Args>(args)...);
     }
 
-    template <is_stream_emitter EmitterType, class... Args>
+    template <IsStreamEmitter EmitterType, class... Args>
       requires(std::constructible_from<EmitterType, Args...>)
     std::shared_ptr<StreamEmitter<void>> make_shared(Args &&...args) {
       return std::make_shared<StreamEmitter<EmitterType>>(std::forward<Args>(args)...);
     }
   };
 
-  export template <is_stream_emitter T>
+  export template <IsStreamEmitter T>
   struct StreamEmitter<T> : private T, public StreamEmitter<void> {
     using T::T;
 
@@ -88,37 +88,36 @@ namespace jowi::crogger {
     }
   };
 
+  /*
+   * string stream emitter
+   */
   export struct SsEmitter {
   private:
     std::unique_ptr<Emitter<void>> __emt;
     std::string __buf;
     uint64_t __cur;
+    uint64_t __original_size;
 
   public:
-    SsEmitter(uint64_t buf_size, is_emitter auto &&emt) :
+    SsEmitter(uint64_t buf_size, IsEmitter auto &&emt) :
       __emt{Emitter<>::make_unique<std::decay_t<decltype(emt)>>(std::forward<decltype(emt)>(emt))},
-      __buf{}, __cur{0} {
-      __buf.reserve(buf_size);
-      for (uint64_t i = 0; i < buf_size; i += 1)
-        __buf.push_back('\0');
-    }
-    SsEmitter(is_emitter auto &&emt) : SsEmitter(120, std::forward<decltype(emt)>(emt)) {}
+      __buf(buf_size, '\0'), __cur{0}, __original_size{buf_size} {}
+    SsEmitter(IsEmitter auto &&emt) : SsEmitter(256, std::forward<decltype(emt)>(emt)) {}
     void push_back(char x) {
-      __buf[__cur] = x;
-      __cur += 1;
-      if (__cur == __buf.length()) {
-        auto res = __emt->emit(__buf);
-        if (!res) {
-          throw res.error();
-        }
-        __cur = 0;
-      };
+      if (__cur != __buf.length()) {
+        __buf[__cur] = x;
+        __cur += 1;
+      } else {
+        __buf.push_back(x);
+        __cur += 1;
+      }
     }
-    std::expected<void, LogError> flush() noexcept(
-      noexcept(__emt->emit(std::declval<std::string_view>()))
-    ) {
+    std::expected<void, LogError> flush() {
       return __emt->emit(std::string_view{__buf.begin(), __buf.begin() + __cur}).transform([&]() {
         __cur = 0;
+        if (__buf.length() != __original_size) {
+          __buf.resize(__original_size);
+        }
       });
     }
   };
@@ -129,10 +128,17 @@ namespace jowi::crogger {
     }
   };
 
+  struct FileCloser {
+    void operator()(std::FILE *f) {
+      if (f != nullptr) {
+        std::fclose(f);
+      }
+    }
+  };
+
   export struct FileEmitter {
   private:
-    constexpr static auto fcloser = [](FILE *f) { fclose(f); };
-    using FilePtrType = std::unique_ptr<FILE, decltype(fcloser)>;
+    using FilePtrType = std::unique_ptr<FILE, FileCloser>;
     FilePtrType __f;
     fs::path __path;
 
@@ -142,9 +148,7 @@ namespace jowi::crogger {
     std::expected<void, LogError> emit(std::string_view v) const {
       auto res = fwrite(v.data(), sizeof(char), v.length(), __f.get());
       if (res != v.length()) {
-        return std::unexpected{
-          LogError{LogErrorType::io_error, "cannot write to file {}", __path.c_str()}
-        };
+        return std::unexpected{LogError::io_error("cannot write to file {}", __path.c_str())};
       }
       return {};
     }
@@ -156,9 +160,9 @@ namespace jowi::crogger {
     static std::expected<FileEmitter, LogError> open(const fs::path &p, bool append) {
       FILE *f = fopen(p.c_str(), append ? "a" : "w");
       if (f == nullptr) {
-        return std::unexpected{LogError{LogErrorType::io_error, "cannot open file {}", p.c_str()}};
+        return std::unexpected{LogError::io_error("cannot open file {}", p.c_str())};
       }
-      FilePtrType ptr{f, fcloser};
+      FilePtrType ptr{f, FileCloser{}};
       return FileEmitter{std::move(ptr), p};
     }
   };
@@ -170,7 +174,15 @@ namespace jowi::crogger {
     }
   };
 
+  export struct StderrEmitter {
+    std::expected<void, LogError> emit(std::string_view d) const {
+      fwrite(d.data(), sizeof(char), d.length(), stderr);
+      return {};
+    }
+  };
+
   template struct Emitter<FileEmitter>;
   template struct Emitter<StdoutEmitter>;
+  template struct Emitter<StderrEmitter>;
   template struct Emitter<EmptyEmitter>;
 }

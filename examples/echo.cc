@@ -13,7 +13,7 @@ int main(int argc, const char **argv) {
     argv
   };
 
-  app.add_argument("--echo").required();
+  app.add_argument("--echo").help("The string to echo out").add_validator(cli::ArgDefaultValidator{"Hello World"}).required();
   app.parse_args();
 
   std::println("{}", app.args().first_of("--echo").value());

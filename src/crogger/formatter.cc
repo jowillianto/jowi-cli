@@ -6,20 +6,20 @@ module;
 export module jowi.crogger:formatter;
 import jowi.tui;
 import :error;
-import :context;
+import :log_context;
 import :emitter;
 
 namespace tui = jowi::tui;
 namespace jowi::crogger {
   export template <class T>
-  concept is_formatter = requires(
-    const T Formatter, const Context &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
+  concept IsFormatter = requires(
+    const T Formatter, const LogContext &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
   ) {
     { Formatter.format(ctx, it) } -> std::same_as<std::expected<void, LogError>>;
   };
 
   export template <typename T>
-  concept format_checkable = requires(const T Formatter, const Context &ctx) {
+  concept format_checkable = requires(const T Formatter, const LogContext &ctx) {
     { Formatter.check(ctx) } -> std::same_as<std::expected<void, LogError>>;
   };
 
@@ -28,12 +28,12 @@ namespace jowi::crogger {
   export template <> struct Formatter<void> {
     virtual ~Formatter() = default;
 
-    virtual std::expected<void, LogError> check(const Context &) const = 0;
+    virtual std::expected<void, LogError> check(const LogContext &) const = 0;
     virtual std::expected<void, LogError> format(
-      const Context &, std::back_insert_iterator<StreamEmitter<void>> &
+      const LogContext &, std::back_insert_iterator<StreamEmitter<void>> &
     ) const = 0;
   };
-  export template <is_formatter FormatterType>
+  export template <IsFormatter FormatterType>
   struct Formatter<FormatterType> : private FormatterType, public Formatter<void> {
     using FormatterType::FormatterType; // Inherit constructors
 
@@ -41,12 +41,12 @@ namespace jowi::crogger {
     Formatter(FormatterType &&Formatter) : FormatterType(std::move(Formatter)) {}
 
     std::expected<void, LogError> format(
-      const Context &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
+      const LogContext &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
     ) const override {
       return FormatterType::format(ctx, it);
     }
 
-    std::expected<void, LogError> check(const Context &ctx) const override {
+    std::expected<void, LogError> check(const LogContext &ctx) const override {
       if constexpr (format_checkable<FormatterType>) {
         return FormatterType::check(ctx);
       } else {
@@ -64,22 +64,22 @@ namespace jowi::crogger {
       if (lvl < 50) return tui::RgbColor::magenta();
       return tui::RgbColor::red();
     }
+    template <class T>
     std::expected<void, LogError> format(
-      const Context &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
+      const LogContext &ctx, std::back_insert_iterator<T> &it
     ) const {
 
       tui::AnsiFormatter<std::decay_t<decltype(it)>>::render(
-        tui::Layout{}
-          .append_child(
-            tui::Layout{}
-              .style(tui::DomStyle{}.fg(get_level_color(ctx.status.level)))
-              .append_child(tui::Paragraph("[{}]", ctx.status.name).no_newline())
-          )
-          .append_child(tui::Paragraph(" {:%FT%TZ} ", ctx.time).no_newline()),
+        tui::Layout{}.append_child(
+          tui::Layout{}
+            .style(tui::DomStyle{}.fg(get_level_color(ctx.status.level)))
+            .append_child(tui::Paragraph("[{}]", ctx.status.name).no_newline())
+        ),
         it,
         0,
         std::nullopt
       );
+      std::format_to(it, " {:%FT%TZ} ", ctx.time);
       ctx.message.format(it);
       it = '\n';
       return {};
@@ -88,7 +88,7 @@ namespace jowi::crogger {
 
   export struct BwFormatter {
     std::expected<void, LogError> format(
-      const Context &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
+      const LogContext &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
     ) const {
       std::format_to(it, "[{}] {:%FT%TZ} ", ctx.status.name, ctx.time);
       ctx.message.format(it);
@@ -99,7 +99,7 @@ namespace jowi::crogger {
 
   export struct EmptyFormatter {
     std::expected<void, LogError> format(
-      const Context &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
+      const LogContext &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
     ) const {
       return {};
     }
@@ -107,7 +107,7 @@ namespace jowi::crogger {
 
   export struct PlainFormatter {
     std::expected<void, LogError> format(
-      const Context &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
+      const LogContext &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
     ) const {
       ctx.message.format(it);
       it = '\n';

@@ -1,44 +1,44 @@
 module;
 
-export module jowi.crogger:severity;
+export module jowi.crogger:log_level;
 import jowi.generic;
 
 namespace jowi::crogger {
-  export struct Severity {
+  export struct LogLevel {
     generic::FixedString<10> name;
     unsigned int level;
 
-    static Severity trace() noexcept {
+    static LogLevel trace() noexcept {
       return {"TRACE", 0};
     }
 
-    static Severity debug() noexcept {
+    static LogLevel debug() noexcept {
       return {"DEBUG", 10};
     }
 
-    static Severity info() noexcept {
+    static LogLevel info() noexcept {
       return {"INFO", 20};
     }
 
-    static Severity warn() noexcept {
+    static LogLevel warn() noexcept {
       return {"WARN", 30};
     }
 
-    static Severity error() noexcept {
+    static LogLevel error() noexcept {
       return {"ERROR", 40};
     }
 
-    static Severity critical() noexcept {
+    static LogLevel critical() noexcept {
       return {"CRITICAL", 50};
     }
 
     // Three-way comparison operator - compare only the level field
-    friend auto operator<=>(const Severity &lhs, const Severity &rhs) noexcept {
+    friend auto operator<=>(const LogLevel &lhs, const LogLevel &rhs) noexcept {
       return lhs.level <=> rhs.level;
     }
 
     // Equality operator - compare only the level field
-    friend bool operator==(const Severity &lhs, const Severity &rhs) noexcept {
+    friend bool operator==(const LogLevel &lhs, const LogLevel &rhs) noexcept {
       return lhs.level == rhs.level;
     }
   };

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.28)
-project (jowi_cli)
+project (jowi_cli VERSION 1.1.0)
 set (CMAKE_CXX_STANDARD 23)
 set (CMAKE_CXX_STANDARD_REQUIRED true)
 set (CMAKE_CXX_SCAN_FOR_MODULES true)
@@ -12,9 +12,48 @@ if (NOT TARGET jowi::generic)
     add_subdirectory(${CMAKE_CURRENT_LIST_DIR}/libs/jowi-generic)
 endif()
 
-add_library(${PROJECT_NAME})
-add_library(jowi::cli ALIAS ${PROJECT_NAME})
-target_sources(${PROJECT_NAME}
+# Terminal UI
+add_library(jowi_tui)
+add_library(jowi::tui ALIAS jowi_tui)
+target_sources(jowi_tui
+    PUBLIC
+        FILE_SET CXX_MODULES
+            FILES
+                "${CMAKE_CURRENT_LIST_DIR}/src/tui.cc"
+)
+target_compile_features(jowi_tui PUBLIC cxx_std_23)
+target_link_libraries(jowi_tui
+    PUBLIC
+        jowi::generic
+)
+
+# Logging
+add_library(jowi_crogger)
+add_library(jowi::crogger ALIAS jowi_crogger)
+target_sources(jowi_crogger
+    PUBLIC
+        FILE_SET CXX_MODULES
+            FILES
+                "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_context.cc"
+                "${CMAKE_CURRENT_LIST_DIR}/src/crogger/emitter.cc"
+                "${CMAKE_CURRENT_LIST_DIR}/src/crogger/error.cc"
+                "${CMAKE_CURRENT_LIST_DIR}/src/crogger/filter.cc"
+                "${CMAKE_CURRENT_LIST_DIR}/src/crogger/formatter.cc"
+                "${CMAKE_CURRENT_LIST_DIR}/src/crogger/logger.cc"
+                "${CMAKE_CURRENT_LIST_DIR}/src/crogger/main.cc"
+                "${CMAKE_CURRENT_LIST_DIR}/src/crogger/log_level.cc"
+)
+target_link_libraries(jowi_crogger
+    PUBLIC
+        jowi::generic
+        jowi::tui
+)
+target_compile_features(jowi_crogger PUBLIC cxx_std_23)
+
+# Command Line Application
+add_library(jowi_cli)
+add_library(jowi::cli ALIAS jowi_cli)
+target_sources(jowi_cli
   PUBLIC
     FILE_SET CXX_MODULES
       FILES
@@ -31,28 +70,31 @@ target_sources(${PROJECT_NAME}
         "${CMAKE_CURRENT_LIST_DIR}/src/parse_error.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/parsed_arg.cc"
         "${CMAKE_CURRENT_LIST_DIR}/src/raw_args.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/tui.cc"
 )
-target_link_libraries(${PROJECT_NAME} PUBLIC jowi::generic)
-target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
+target_link_libraries(jowi_cli
+    PUBLIC
+        jowi::generic
+        jowi::tui
+)
+target_compile_features(jowi_cli PUBLIC cxx_std_23)
 
-add_library(jowi_crogger)
-add_library(jowi::crogger ALIAS jowi_crogger)
-target_sources(jowi_crogger
-  PUBLIC
-    FILE_SET CXX_MODULES
-      FILES
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/error.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/context.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/severity.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/filter.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/formatter.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/logger.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/emitter.cc"
-        "${CMAKE_CURRENT_LIST_DIR}/src/crogger/main.cc"
-)
-target_link_libraries(jowi_crogger PUBLIC jowi::generic jowi::cli)
-target_compile_features(jowi_crogger PUBLIC cxx_std_23)
+# add_library(jowi_crogger)
+# add_library(jowi::crogger ALIAS jowi_crogger)
+# target_sources(jowi_crogger
+#   PUBLIC
+#     FILE_SET CXX_MODULES
+#       FILES
+#         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/error.cc"
+#         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/context.cc"
+#         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/severity.cc"
+#         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/filter.cc"
+#         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/formatter.cc"
+#         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/logger.cc"
+#         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/emitter.cc"
+#         "${CMAKE_CURRENT_LIST_DIR}/src/crogger/main.cc"
+# )
+# target_link_libraries(jowi_crogger PUBLIC jowi::generic jowi::cli)
+# target_compile_features(jowi_crogger PUBLIC cxx_std_23)
 
 if (JOWI_CLI_BUILD_TESTS)
     include(CTest)

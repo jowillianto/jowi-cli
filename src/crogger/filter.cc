@@ -2,11 +2,11 @@ module;
 #include <concepts>
 #include <memory>
 export module jowi.crogger:filter;
-import :context;
+import :log_context;
 
 namespace jowi::crogger {
   export template <typename T>
-  concept is_filter = requires(const T filter, const Context &data) {
+  concept IsFilter = requires(const T filter, const LogContext &data) {
     { filter.filter(data) } -> std::same_as<bool>;
   };
 
@@ -16,51 +16,69 @@ namespace jowi::crogger {
   export template <> struct ContextFilter<void> {
     virtual ~ContextFilter() = default;
 
-    virtual bool filter(const Context &data) const = 0;
+    virtual bool filter(const LogContext &data) const = 0;
   };
 
   // Template for types that satisfy basic_filter
-  export template <is_filter FilterType>
+  export template <IsFilter FilterType>
   struct ContextFilter<FilterType> : private FilterType, public ContextFilter<void> {
     using FilterType::FilterType; // Inherit constructors
 
     // Move constructor
     ContextFilter(FilterType &&filter) : FilterType(std::move(filter)) {}
 
-    bool filter(const Context &data) const override {
+    bool filter(const LogContext &data) const override {
       return FilterType::filter(data);
     }
   };
 
-  export enum struct FilterOp { eq, lt, lte, gt, gte };
+  enum struct FilterOp { EQ, LT, LTE, GT, GTE };
 
-  export struct SeverityFilter {
+  export struct LevelFilter {
     FilterOp op;
     unsigned int level;
 
-    bool filter(const Context &data) const {
+    bool filter(const LogContext &data) const {
       unsigned int level_l = data.status.level;
       switch (op) {
-        case FilterOp::eq:
+        case FilterOp::EQ:
           return level_l == level;
-        case FilterOp::lt:
+        case FilterOp::LT:
           return level_l < level;
-        case FilterOp::lte:
+        case FilterOp::LTE:
           return level_l <= level;
-        case FilterOp::gt:
+        case FilterOp::GT:
           return level_l > level;
-        case FilterOp::gte:
+        case FilterOp::GTE:
           return level_l >= level;
       };
+    }
+
+    static LevelFilter equal_to(unsigned int level) {
+      return LevelFilter{FilterOp::EQ, level};
+    }
+
+    static LevelFilter less_than(unsigned int level) {
+      return LevelFilter{FilterOp::LT, level};
+    }
+
+    static LevelFilter less_than_or_equal_to(unsigned int level) {
+      return LevelFilter{FilterOp::LTE, level};
+    }
+    static LevelFilter greater_than(unsigned int level) {
+      return LevelFilter{FilterOp::GT, level};
+    }
+    static LevelFilter greater_than_or_equal_to(unsigned int level) {
+      return LevelFilter{FilterOp::GTE, level};
     }
   };
 
   export struct NoFilter {
-    bool filter(const Context &data) const {
+    bool filter(const LogContext &data) const {
       return true;
     }
   };
 
-  template struct ContextFilter<SeverityFilter>;
+  template struct ContextFilter<LevelFilter>;
   template struct ContextFilter<NoFilter>;
 }
