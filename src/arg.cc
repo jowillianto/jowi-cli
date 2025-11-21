@@ -306,6 +306,34 @@ namespace jowi::cli {
     }
   };
 
+  export struct ArgDefaultValidator {
+  private:
+    std::string __v;
+
+  public:
+    ArgDefaultValidator(std::string v) : __v{std::move(v)} {}
+    template <class T>
+      requires(std::invocable<decltype(static_cast<std::string (*)(T)>(std::to_string)), T>)
+    ArgDefaultValidator(T v) : __v{std::to_string(v)} {}
+
+    std::optional<std::string> id() const {
+      return "ArgDefaultValidator";
+    }
+
+    std::optional<tui::DomNode> help() const {
+      return tui::DomNode::paragraph("Default: {}", __v);
+    }
+
+    std::expected<void, ParseError> post_validate(
+      std::optional<std::reference_wrapper<const ArgKey>> key, ParsedArg &args
+    ) const {
+      if (key.has_value() && !args.contains(key.value().get())) {
+        args.add_argument(key.value(), __v);
+      }
+      return {};
+    }
+  };
+
   export struct Arg {
   private:
     std::vector<std::unique_ptr<ArgValidator<void>>> __vtors;
@@ -324,24 +352,33 @@ namespace jowi::cli {
       return *this;
     }
     template <is_arg_validator ValidatorType> Arg &add_validator(ValidatorType &&v) {
-      std::unique_ptr<ArgValidator<void>> new_vtor =
+      std::unique_ptr<ArgValidator<void>> new_validator =
         std::make_unique<ArgValidator<ValidatorType>>(std::forward<ValidatorType>(v));
-      auto new_vtor_id = new_vtor->id();
-      if (new_vtor_id) {
-        auto it =
-          std::ranges::find_if(__vtors, [&](const std::unique_ptr<ArgValidator<void>> &vtor) {
-            auto vtor_id = vtor->id();
-            return vtor_id && vtor_id.value() == new_vtor_id.value();
-          });
-        if (it == __vtors.end()) {
-          __vtors.emplace_back(std::move(new_vtor));
-        } else {
-          *it = std::move(new_vtor);
-        }
-      } else {
-        __vtors.emplace_back(std::move(new_vtor));
+      auto new_validator_id = new_validator->id();
+      auto it =
+        std::ranges::find_if(__vtors, [&](const std::unique_ptr<ArgValidator<void>> &validator) {
+          auto validator_id = validator->id();
+          if (validator_id.has_value() && new_validator_id.has_value()) {
+            return validator_id.value() == new_validator_id.value();
+          }
+          return false;
+        });
+      if (it != __vtors.end()) {
+        __vtors.erase(it);
       }
+      __vtors.emplace_back(std::move(new_validator));
       return *this;
+    }
+    template <class... Args>
+      requires(is_arg_validator<Args> && ...)
+    Arg &add_validators(Args &&...args) {
+      (add_validator(std::forward<Args>(args)), ...);
+      return *this;
+    }
+    template <class... Args>
+      requires(std::constructible_from<ArgDefaultValidator, Args...>)
+    Arg &with_default(Args &&...args) {
+      return add_validator(ArgDefaultValidator{std::forward<Args>(args)...});
     }
     // shortcut build functions
     Arg &n_at_least(uint64_t min_size) {
@@ -363,10 +400,10 @@ namespace jowi::cli {
       return add_validator(ArgEmptyValidator{true});
     }
     Arg &required() {
-      return require_value().n_equal_to(1);
+      return add_validators(ArgEmptyValidator{false}, ArgCountValidator::equal_to(1));
     }
     Arg &optional() {
-      return n_range(0, 1);
+      return add_validators(ArgCountValidator::range(0, 1));
     }
 
     // Validator Attributes
@@ -387,9 +424,7 @@ namespace jowi::cli {
       return arg;
     }
     static Arg flag() {
-      Arg arg{};
-      arg.as_flag().optional();
-      return arg;
+      return Arg{};
     }
 
     // Arg Validator Implementation
