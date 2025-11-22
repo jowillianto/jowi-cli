@@ -17,38 +17,35 @@ import :arg_key;
 namespace tui = jowi::tui;
 
 namespace jowi::cli {
-  export template <class T>
-  concept unique_arg_validator = requires(const std::decay_t<T> t) {
-    { t.id() } -> std::same_as<std::optional<std::string>>;
-  };
-
-  export template <class T>
-  concept help_providing_arg_validator = requires(const std::decay_t<T> t) {
-    { t.help() } -> std::same_as<std::optional<tui::DomNode>>;
-  };
-
-  export template <class T>
-  concept value_arg_validator =
-    requires(const std::decay_t<T> t, std::optional<std::string_view> sv) {
-      { t.validate(sv) } -> std::same_as<std::expected<void, ParseError>>;
+  namespace validator {
+    template <class T>
+    concept HasId = requires(const std::decay_t<T> t) {
+      { t.id() } -> std::same_as<std::optional<std::string>>;
+    };
+    template <class T>
+    concept HasHelp = requires(const std::decay_t<T> t) {
+      { t.help() } -> std::same_as<std::optional<tui::DomNode>>;
     };
 
-  export template <class T>
-  concept post_validate_arg_validator = requires(
-    const std::decay_t<T> t, std::optional<std::reference_wrapper<const ArgKey>> key, ParsedArg &pa
-  ) {
-    { t.post_validate(key, pa) } -> std::same_as<std::expected<void, ParseError>>;
-  };
+    template <class T>
+    concept HasValidate = requires(const std::decay_t<T> t, std::optional<std::string_view> value) {
+      { t.validate(value) } -> std::same_as<std::expected<void, ParseError>>;
+    };
 
-  export template <class ValidatorType>
-  concept is_arg_validator =
-    unique_arg_validator<ValidatorType> || help_providing_arg_validator<ValidatorType> ||
-    value_arg_validator<ValidatorType> || post_validate_arg_validator<ValidatorType>;
+    template <class T>
+    concept HasPostValidate = requires(
+      const std::decay_t<T> t, std::optional<std::reference_wrapper<ArgKey>> key, ParsedArg &args
+    ) {
+      { t.post_validate(key, args) } -> std::same_as<std::expected<void, ParseError>>;
+    };
+  }
+  export template <class T>
+  concept IsArgValidator = validator::HasId<T> || validator::HasHelp<T> ||
+    validator::HasValidate<T> || validator::HasPostValidate<T>;
 
   template <class T>
-    requires(is_arg_validator<T> || std::same_as<T, void>)
+    requires(IsArgValidator<T> || std::same_as<T, void>)
   struct ArgValidator;
-
   template <> struct ArgValidator<void> {
     virtual std::optional<std::string> id() const = 0;
     virtual std::optional<tui::DomNode> help() const = 0;
@@ -60,27 +57,28 @@ namespace jowi::cli {
     ) const = 0;
     virtual ~ArgValidator() = default;
   };
-  template <is_arg_validator ValidatorType>
-  struct ArgValidator<ValidatorType> : private ValidatorType, ArgValidator<void> {
-    using ValidatorType::ValidatorType;
-    ArgValidator(ValidatorType validator) : ValidatorType{std::move(validator)} {}
+
+  template <IsArgValidator Validator>
+  struct ArgValidator<Validator> : private Validator, ArgValidator<void> {
+    using Validator::Validator;
+    ArgValidator(Validator validator) : Validator{std::move(validator)} {}
     std::optional<std::string> id() const override {
-      if constexpr (unique_arg_validator<ValidatorType>) {
-        return ValidatorType::id();
+      if constexpr (validator::HasId<Validator>) {
+        return Validator::id();
       } else {
         return std::nullopt;
       }
     }
     std::optional<tui::DomNode> help() const override {
-      if constexpr (help_providing_arg_validator<ValidatorType>) {
-        return ValidatorType::help();
+      if constexpr (validator::HasHelp<Validator>) {
+        return Validator::help();
       } else {
         return std::nullopt;
       }
     }
     std::expected<void, ParseError> validate(std::optional<std::string_view> value) const override {
-      if constexpr (value_arg_validator<ValidatorType>) {
-        return ValidatorType::validate(value);
+      if constexpr (validator::HasValidate<Validator>) {
+        return Validator::validate(value);
       } else {
         return {};
       }
@@ -88,8 +86,8 @@ namespace jowi::cli {
     std::expected<void, ParseError> post_validate(
       std::optional<std::reference_wrapper<const ArgKey>> key, ParsedArg &args
     ) const override {
-      if constexpr (post_validate_arg_validator<ValidatorType>) {
-        return ValidatorType::post_validate(key, args);
+      if constexpr (validator::HasPostValidate<Validator>) {
+        return Validator::post_validate(key, args);
       } else {
         return {};
       }
@@ -351,9 +349,9 @@ namespace jowi::cli {
       __help_text.emplace(std::format(fmt, std::forward<Args>(args)...));
       return *this;
     }
-    template <is_arg_validator ValidatorType> Arg &add_validator(ValidatorType &&v) {
+    template <IsArgValidator Validator> Arg &add_validator(Validator &&v) {
       std::unique_ptr<ArgValidator<void>> new_validator =
-        std::make_unique<ArgValidator<ValidatorType>>(std::forward<ValidatorType>(v));
+        std::make_unique<ArgValidator<Validator>>(std::forward<Validator>(v));
       auto new_validator_id = new_validator->id();
       auto it =
         std::ranges::find_if(__vtors, [&](const std::unique_ptr<ArgValidator<void>> &validator) {
@@ -370,7 +368,7 @@ namespace jowi::cli {
       return *this;
     }
     template <class... Args>
-      requires(is_arg_validator<Args> && ...)
+      requires(IsArgValidator<Args> && ...)
     Arg &add_validators(Args &&...args) {
       (add_validator(std::forward<Args>(args)), ...);
       return *this;
