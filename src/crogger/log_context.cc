@@ -11,7 +11,7 @@ namespace jowi::crogger {
   export struct RawMessage {
   public:
     virtual ~RawMessage() = default;
-    virtual void format(std::back_insert_iterator<StreamEmitter<void>> &it) const = 0;
+    virtual void format(std::back_insert_iterator<std::string> &it) const = 0;
   };
 
   // Concrete implementation that holds format string and arguments
@@ -24,7 +24,7 @@ namespace jowi::crogger {
     Message(std::format_string<Args...> fmt, Args... arguments) :
       __fmt(fmt.get()), __args(std::forward<Args>(arguments)...) {}
 
-    void format(std::back_insert_iterator<StreamEmitter<void>> &it) const override {
+    void format(std::back_insert_iterator<std::string> &it) const override {
       std::apply(
         [&](const auto &...args) { std::vformat_to(it, __fmt, std::make_format_args(args...)); },
         __args

@@ -12,15 +12,8 @@ import :emitter;
 namespace tui = jowi::tui;
 namespace jowi::crogger {
   export template <class T>
-  concept IsFormatter = requires(
-    const T Formatter, const LogContext &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
-  ) {
-    { Formatter.format(ctx, it) } -> std::same_as<std::expected<void, LogError>>;
-  };
-
-  export template <typename T>
-  concept format_checkable = requires(const T Formatter, const LogContext &ctx) {
-    { Formatter.check(ctx) } -> std::same_as<std::expected<void, LogError>>;
+  concept IsFormatter = requires(const T Formatter, const LogContext &ctx) {
+    { Formatter.format(ctx) } -> std::same_as<std::expected<std::string, LogError>>;
   };
 
   export template <class T = void> struct Formatter;
@@ -28,10 +21,7 @@ namespace jowi::crogger {
   export template <> struct Formatter<void> {
     virtual ~Formatter() = default;
 
-    virtual std::expected<void, LogError> check(const LogContext &) const = 0;
-    virtual std::expected<void, LogError> format(
-      const LogContext &, std::back_insert_iterator<StreamEmitter<void>> &
-    ) const = 0;
+    virtual std::expected<std::string, LogError> format(const LogContext &) const = 0;
   };
   export template <IsFormatter FormatterType>
   struct Formatter<FormatterType> : private FormatterType, public Formatter<void> {
@@ -40,18 +30,8 @@ namespace jowi::crogger {
     // Move constructor
     Formatter(FormatterType &&Formatter) : FormatterType(std::move(Formatter)) {}
 
-    std::expected<void, LogError> format(
-      const LogContext &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
-    ) const override {
-      return FormatterType::format(ctx, it);
-    }
-
-    std::expected<void, LogError> check(const LogContext &ctx) const override {
-      if constexpr (format_checkable<FormatterType>) {
-        return FormatterType::check(ctx);
-      } else {
-        return {}; // Return success (void) as default
-      }
+    std::expected<std::string, LogError> format(const LogContext &ctx) const override {
+      return FormatterType::format(ctx);
     }
   };
 
@@ -64,12 +44,10 @@ namespace jowi::crogger {
       if (lvl < 50) return tui::RgbColor::magenta();
       return tui::RgbColor::red();
     }
-    template <class T>
-    std::expected<void, LogError> format(
-      const LogContext &ctx, std::back_insert_iterator<T> &it
-    ) const {
-
-      tui::AnsiFormatter<std::decay_t<decltype(it)>>::render(
+    std::expected<std::string, LogError> format(const LogContext &ctx) const {
+      std::expected<std::string, LogError> buf{std::string{}};
+      std::back_insert_iterator<std::string> it = std::back_inserter(buf.value());
+      tui::AnsiFormatter<std::back_insert_iterator<std::string>>::render(
         tui::Layout{}.append_child(
           tui::Layout{}
             .style(tui::DomStyle{}.fg(get_level_color(ctx.status.level)))
@@ -82,36 +60,34 @@ namespace jowi::crogger {
       std::format_to(it, " {:%FT%TZ} ", ctx.time);
       ctx.message.format(it);
       it = '\n';
-      return {};
+      return buf;
     }
   };
 
   export struct BwFormatter {
-    std::expected<void, LogError> format(
-      const LogContext &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
-    ) const {
+    std::expected<std::string, LogError> format(const LogContext &ctx) const {
+      std::expected<std::string, LogError> buf{std::string{}};
+      auto it = std::back_inserter(buf.value());
       std::format_to(it, "[{}] {:%FT%TZ} ", ctx.status.name, ctx.time);
       ctx.message.format(it);
       it = '\n';
-      return {};
+      return buf;
     }
   };
 
   export struct EmptyFormatter {
-    std::expected<void, LogError> format(
-      const LogContext &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
-    ) const {
+    std::expected<std::string, LogError> format(const LogContext &ctx) const {
       return {};
     }
   };
 
   export struct PlainFormatter {
-    std::expected<void, LogError> format(
-      const LogContext &ctx, std::back_insert_iterator<StreamEmitter<void>> &it
-    ) const {
+    std::expected<std::string, LogError> format(const LogContext &ctx) const {
+      std::expected<std::string, LogError> buf{std::string{}};
+      std::back_insert_iterator<std::string> it = std::back_inserter(buf.value());
       ctx.message.format(it);
       it = '\n';
-      return {};
+      return buf;
     }
   };
 
