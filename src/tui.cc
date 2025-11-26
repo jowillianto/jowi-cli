@@ -1,21 +1,14 @@
 module;
+#include <array>
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
-#include <cstdio>
-#include <exception>
-#include <expected>
 #include <format>
 #include <functional>
-#include <iterator>
-#include <memory>
 #include <optional>
-#include <print>
 #include <ranges>
 #include <string>
-#include <string_view>
 #include <type_traits>
-#include <unordered_map>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -115,7 +108,7 @@ namespace jowi::tui {
     std::string text;
     bool new_line = true;
 
-    Paragraph(): text{} {}
+    Paragraph() : text{} {}
     Paragraph(std::string text) : text(std::move(text)) {}
 
     template <class... Args>
@@ -275,70 +268,46 @@ namespace jowi::tui {
 
   export using Layout = DomNode::Layout;
 
-  export class RenderError : public std::exception {
-  private:
-    generic::FixedString<64> __msg;
+  namespace ansi {
+    inline constexpr std::array<std::pair<RgbColor, unsigned int>, 16> ANSI_BG_MAP{{
+      {RgbColor::black(), 40},
+      {RgbColor::red(), 41},
+      {RgbColor::green(), 42},
+      {RgbColor::yellow(), 43},
+      {RgbColor::blue(), 44},
+      {RgbColor::magenta(), 45},
+      {RgbColor::cyan(), 46},
+      {RgbColor::white(), 47},
+      {RgbColor::bright_black(), 100},
+      {RgbColor::bright_red(), 101},
+      {RgbColor::bright_green(), 102},
+      {RgbColor::bright_yellow(), 103},
+      {RgbColor::bright_blue(), 104},
+      {RgbColor::bright_magenta(), 105},
+      {RgbColor::bright_cyan(), 106},
+      {RgbColor::bright_white(), 107},
+    }};
 
-  public:
-    explicit RenderError(generic::FixedString<64> msg) noexcept : __msg{std::move(msg)} {}
-    explicit RenderError(std::string_view msg) noexcept : __msg{msg} {}
+    inline constexpr std::array<std::pair<RgbColor, unsigned int>, 16> ANSI_FG_MAP{{
+      {RgbColor::black(), 30},
+      {RgbColor::red(), 31},
+      {RgbColor::green(), 32},
+      {RgbColor::yellow(), 33},
+      {RgbColor::blue(), 34},
+      {RgbColor::magenta(), 35},
+      {RgbColor::cyan(), 36},
+      {RgbColor::white(), 37},
+      {RgbColor::bright_black(), 90},
+      {RgbColor::bright_red(), 91},
+      {RgbColor::bright_green(), 92},
+      {RgbColor::bright_yellow(), 93},
+      {RgbColor::bright_blue(), 94},
+      {RgbColor::bright_magenta(), 95},
+      {RgbColor::bright_cyan(), 96},
+      {RgbColor::bright_white(), 97},
+    }};
 
-    template <class... Args>
-      requires(std::formattable<Args, char> && ...)
-    static RenderError format(std::format_string<Args...> fmt, Args &&...args) {
-      generic::FixedString<64> buf;
-      buf.emplace_format(fmt, std::forward<Args>(args)...);
-      return RenderError{buf};
-    }
-
-    const char *what() const noexcept override {
-      return __msg.c_str();
-    }
-  };
-
-  using RenderResult = std::expected<void, RenderError>;
-
-  export template <class Renderer>
-  concept IsDomRenderer = requires(Renderer renderer, const DomNode &node) {
-    { renderer.render(node) } -> std::same_as<RenderResult>;
-    { renderer.clear() } -> std::same_as<RenderResult>;
-  };
-
-  export struct FileCloser {
-    bool is_closer{true};
-    void operator()(std::FILE *file) const noexcept {
-      if (file && is_closer) {
-        std::fclose(file);
-      }
-    }
-  };
-  export using FileHandle = std::unique_ptr<std::FILE, FileCloser>;
-
-  export template <class Iterator> struct AnsiFormatter {
-  private:
-    using ColorMap = std::unordered_map<RgbColor, std::pair<std::uint8_t, std::uint8_t>>;
-    using EffectMap = std::unordered_map<TextEffect, std::uint8_t>;
-
-    inline static const ColorMap COLOR_MAP{
-      {RgbColor::black(), {30, 40}},
-      {RgbColor::red(), {31, 41}},
-      {RgbColor::green(), {32, 42}},
-      {RgbColor::yellow(), {33, 43}},
-      {RgbColor::blue(), {34, 44}},
-      {RgbColor::magenta(), {35, 45}},
-      {RgbColor::cyan(), {36, 46}},
-      {RgbColor::white(), {37, 47}},
-      {RgbColor::bright_black(), {90, 100}},
-      {RgbColor::bright_red(), {91, 101}},
-      {RgbColor::bright_green(), {92, 102}},
-      {RgbColor::bright_yellow(), {93, 103}},
-      {RgbColor::bright_blue(), {94, 104}},
-      {RgbColor::bright_magenta(), {95, 105}},
-      {RgbColor::bright_cyan(), {96, 106}},
-      {RgbColor::bright_white(), {97, 107}}
-    };
-
-    inline static const EffectMap EFFECT_MAP{
+    inline constexpr std::array<std::pair<TextEffect, unsigned int>, 9> ANSI_EFFECT_MAP{{
       {TextEffect::BOLD, 1},
       {TextEffect::DIM, 2},
       {TextEffect::ITALIC, 3},
@@ -347,145 +316,164 @@ namespace jowi::tui {
       {TextEffect::RAPID_BLINK, 6},
       {TextEffect::REVERSE, 7},
       {TextEffect::STRIKETHROUGH, 8},
-      {TextEffect::DOUBLE_UNDERLINE, 9}
-    };
+      {TextEffect::DOUBLE_UNDERLINE, 9},
+    }};
 
-  public:
-    static void render(
-      const DomNode &node,
-      Iterator &it,
-      std::uint32_t indent,
-      std::optional<std::reference_wrapper<const DomStyle>> prev_style
-    ) {
-      node.visit(
-        [&](const Paragraph &p) { render(p, it, indent, prev_style); },
-        [&](const Layout &l) { render(l, it, indent, prev_style); }
-      );
-    }
-
-    static void render(
-      const Paragraph &p,
-      Iterator &it,
-      std::uint32_t indent,
-      std::optional<std::reference_wrapper<const DomStyle>> prev_style
-    ) {
-        while (indent) {
-            std::format_to(it, " ");
-            indent -= 1;
-        }
-      if (p.new_line) {
-        std::format_to(it, "{}\n", p.text);
-      } else {
-        std::format_to(it, "{}", p.text);
-      }
-    }
-
-    static void reset_format(Iterator &it) {
-      std::format_to(it, "\x1b[0m");
-    }
-
-    static void render(
-      const Layout &layout,
-      Iterator &it,
-      std::uint32_t indent,
-      std::optional<std::reference_wrapper<const DomStyle>> prev_style
-    ) {
-      bool is_applied = apply_style(it, layout.style());
-      for (const auto &c : layout) {
-        render(c, it, indent + layout.style().indentation(), std::ref(layout.style()));
-      }
-      if (is_applied) reset_format(it);
-      if (prev_style) apply_style(it, prev_style.value());
-    }
-
-    static bool apply_style(Iterator &it, const DomStyle &style) {
-      std::vector<uint8_t> codes;
+    inline std::optional<std::string> render_style(const DomStyle &style) {
+      std::vector<unsigned int> codes;
       if (const auto &effects = style.effects()) {
         for (const auto &effect : *effects) {
-          if (auto it = EFFECT_MAP.find(effect); it != EFFECT_MAP.end()) {
-            codes.emplace_back(it->second);
+          if (const auto it = std::ranges::find_if(
+                ANSI_EFFECT_MAP, [&](const auto &entry) { return entry.first == effect; }
+              );
+              it != ANSI_EFFECT_MAP.end()) {
+            codes.push_back(it->second);
           }
         }
       }
       if (const auto &bg = style.bg_color()) {
-        if (auto it = COLOR_MAP.find(*bg); it != COLOR_MAP.end()) {
-          codes.emplace_back(it->second.second);
+        if (const auto it = std::ranges::find_if(
+              ANSI_BG_MAP, [&](const auto &entry) { return entry.first == *bg; }
+            );
+            it != ANSI_BG_MAP.end()) {
+          codes.push_back(it->second);
         }
       }
       if (const auto &fg = style.fg_color()) {
-        if (auto it = COLOR_MAP.find(*fg); it != COLOR_MAP.end()) {
-          codes.emplace_back(it->second.first);
+        if (const auto it = std::ranges::find_if(
+              ANSI_FG_MAP, [&](const auto &entry) { return entry.first == *fg; }
+            );
+            it != ANSI_FG_MAP.end()) {
+          codes.push_back(it->second);
         }
       }
-      // Now apply styles
-      if (!codes.empty()) {
-        reset_format(it);
-        std::format_to(it, "\x1b[");
-        for (auto i = codes.begin(); i != codes.end(); i += 1) {
-          if (i + 1 == codes.end()) {
-            std::format_to(it, "{}m", std::to_string(*i));
-          } else {
-            std::format_to(it, "{};", std::to_string(*i));
-          }
-        }
-        return true;
+
+      if (codes.empty()) {
+        return std::nullopt;
       }
-      return false;
-    }
-  };
 
-  export class StringRenderer {
-  private:
-    std::optional<std::string> __buffer;
-
-  public:
-    RenderResult render(const DomNode &dom) {
-      __buffer.emplace("");
-      auto it = std::back_inserter(__buffer.value());
-      AnsiFormatter<std::back_insert_iterator<std::string>>::render(dom, it, 0, std::nullopt);
-      return {};
+      std::string code_str{"\x1b["};
+      for (std::size_t i = 0; i < codes.size(); ++i) {
+        if (i != 0) {
+          code_str.push_back(';');
+        }
+        code_str.append(std::to_string(codes[i]));
+      }
+      code_str.push_back('m');
+      return code_str;
     }
 
-    RenderResult clear() {
-      __buffer.reset();
-      return {};
+    template <class T> T reset_format(T out) {
+      std::format_to(out, "\x1b[0m");
+      return out;
     }
 
-    std::string read() {
-      return std::move(__buffer).value_or("");
-    }
-  };
+    template <class T>
+    T render_dom(
+      const DomNode &dom,
+      T out,
+      std::size_t indent,
+      std::optional<std::reference_wrapper<const std::string>> prev_style
+    );
 
-  export class AnsiTerminal {
-  private:
-    FileHandle __file;
+    template <class T> T render_text(const Paragraph &paragraph, T out, std::size_t indent) {
+      for (std::size_t i = 0; i < indent; ++i) {
+        *out++ = ' ';
+      }
+      if (paragraph.new_line) {
+        std::format_to(out, "{}\n", paragraph.text);
 
-  public:
-    explicit AnsiTerminal(FileHandle file) : __file{std::move(file)} {}
-
-    static AnsiTerminal stdout_terminal() {
-      return AnsiTerminal{FileHandle{stdout, FileCloser{false}}};
-    }
-
-    static AnsiTerminal stderr_terminal() {
-      return AnsiTerminal{FileHandle{stderr, FileCloser{false}}};
-    }
-
-    RenderResult render(const DomNode &dom) {
-      std::string buffer{};
-      auto it = std::back_inserter(buffer);
-      AnsiFormatter<std::back_insert_iterator<std::string>>::render(dom, it, 0, std::nullopt);
-      std::print(__file.get(), "{}", buffer);
-      return {};
+      } else {
+        std::format_to(out, "{}", paragraph.text);
+      }
+      return out;
     }
 
-    RenderResult clear() {
-      std::print(__file.get(), "{}", "\x1b[2J");
-      return {};
+    template <class T>
+    T render_layout(
+      const Layout &layout,
+      T out,
+      std::size_t indent,
+      std::optional<std::reference_wrapper<const std::string>> prev_style
+    ) {
+      auto current_style = render_style(layout.style());
+      if (current_style) {
+        reset_format(out);
+        std::format_to(out, "{}", *current_style);
+      }
+
+      for (const auto &child : layout) {
+        render_dom(
+          child,
+          out,
+          indent + static_cast<std::size_t>(layout.style().indentation()),
+          current_style ? std::optional{std::cref(*current_style)} : prev_style
+        );
+      }
+
+      if (current_style) {
+        reset_format(out);
+      }
+      if (prev_style) {
+        std::format_to(out, "{}", prev_style->get());
+      }
+      return out;
     }
-  };
 
-  export inline AnsiTerminal out_terminal = AnsiTerminal::stdout_terminal();
+    template <class T>
+    T render_dom(
+      const DomNode &dom,
+      T out,
+      std::size_t indent,
+      std::optional<std::reference_wrapper<const std::string>> prev_style
+    ) {
+      return dom.visit(
+        [&](const Paragraph &p) { return render_text(p, out, indent); },
+        [&](const Layout &l) { return render_layout(l, out, indent, prev_style); }
+      );
+    }
 
-  export inline AnsiTerminal err_terminal = AnsiTerminal::stderr_terminal();
+    template <class T> T render_dom(const DomNode &dom, T out) {
+      return render_dom(dom, out, 0, std::nullopt);
+    }
+  } // namespace ansi
 } // namespace jowi::tui
+
+namespace std {
+  template <class CharType> struct formatter<jowi::tui::Paragraph, CharType> {
+    static_assert(std::same_as<CharType, char>, "Paragraph formatter only supports char output");
+
+    constexpr auto parse(auto &ctx) {
+      return ctx.begin();
+    }
+
+    auto format(const jowi::tui::Paragraph &paragraph, auto &ctx) const {
+      jowi::tui::ansi::render_text(paragraph, ctx.out(), 0);
+      return ctx.out();
+    }
+  };
+
+  template <class CharType> struct formatter<jowi::tui::Layout, CharType> {
+    static_assert(std::same_as<CharType, char>, "Layout formatter only supports char output");
+
+    constexpr auto parse(auto &ctx) {
+      return ctx.begin();
+    }
+
+    auto format(const jowi::tui::Layout &layout, auto &ctx) const {
+      jowi::tui::ansi::render_layout(layout, ctx.out(), 0, std::nullopt);
+      return ctx.out();
+    }
+  };
+
+  template <class CharType> struct formatter<jowi::tui::DomNode, CharType> {
+
+    constexpr auto parse(auto &ctx) {
+      return ctx.begin();
+    }
+    auto format(const jowi::tui::DomNode &dom, auto &ctx) const {
+      jowi::tui::ansi::render_dom(dom, ctx.out());
+      return ctx.out();
+    }
+  };
+}

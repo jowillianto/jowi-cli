@@ -120,7 +120,7 @@ namespace jowi::cli {
     }
 
     void print_help() const {
-      tui::out_terminal.render(help_dom());
+      std::print("{}", help_dom());
       std::exit(0);
     }
 
@@ -172,7 +172,9 @@ namespace jowi::cli {
       Args &&...args
     ) {
       return expect_or(std::forward<std::expected<T, E> &&>(res), [&](generic::ErrorFormatter e) {
-        tui::err_terminal.render(
+        std::print(
+          stderr,
+          "{}",
           tui::Layout{}
             .style(error_style)
             .append_child(tui::Paragraph(fmt, e, std::forward<Args>(args)...))
@@ -193,7 +195,9 @@ namespace jowi::cli {
     }
     template <class... Args>
     static void error(int ret_code, std::format_string<Args...> fmt, Args &&...args) {
-      tui::err_terminal.render(
+      std::print(
+        stderr,
+        "{}",
         tui::Layout{}
           .style(error_style)
           .append_child(tui::Paragraph(fmt, std::forward<Args>(args)...))

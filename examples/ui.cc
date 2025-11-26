@@ -6,7 +6,8 @@ namespace cli = jowi::cli;
 namespace tui = jowi::tui;
 
 int main() {
-  static_cast<void>(tui::out_terminal.render(
+  std::print(
+    "{}",
     tui::DomNode::vstack(
       tui::Layout{}
         .append_child(
@@ -27,5 +28,5 @@ int main() {
           )
         )
     )
-  ));
+  );
 }

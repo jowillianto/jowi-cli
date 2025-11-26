@@ -13,6 +13,7 @@ No other runtime dependencies are required.
 ```cpp
 import jowi.cli;
 import jowi.tui;
+#include <print>
 namespace cli = jowi::cli;
 namespace tui = jowi::tui;
 
@@ -35,7 +36,7 @@ int main(int argc, const char** argv) {
       .append_child(tui::Paragraph("Hello, {}!", msg).no_newline()) // formatted, no newline
       .append_child(tui::Paragraph(" <- rendered with tui::Paragraph"))
   );
-  tui::out_terminal.render(dom);
+  std::print("{}", dom);
 }
 ```
 
@@ -71,29 +72,7 @@ auto dom = tui::DomNode::vstack(
 auto error_color = tui::RgbColor::bright_red();
 tui::DomStyle{}.effect(tui::TextEffect::UNDERLINE);
 ```
-- **RenderError** – exception type used by renderers; construct via `RenderError::format("msg {}", x)` when producing failures.
-- **IsDomRenderer** – concept for renderers exposing `render(const DomNode&)` and `clear()`, both returning `std::expected<void, RenderError>`.
-- **FileCloser / FileHandle** – small RAII helpers used by the ANSI terminal implementation; you can wrap your own `FILE*` if needed.
-```cpp
-tui::FileHandle fh{fopen("out.txt","w"), tui::FileCloser{}};
-```
-- **AnsiFormatter<Iterator>** – static renderer that walks a DOM tree and writes ANSI-styled text into an iterator (e.g., `std::back_insert_iterator<std::string>`).
-```cpp
-std::string buf;
-auto it = std::back_inserter(buf);
-tui::AnsiFormatter<std::decay_t<decltype(it)>>::render(dom, it, 0, std::nullopt);
-```
-- **StringRenderer** – convenience renderer that stores the formatted string internally; call `render(dom)`, `read()` to grab the buffer, and `clear()` to reset.
-```cpp
-tui::StringRenderer sr;
-sr.render(dom);
-auto text = sr.read();
-```
-- **AnsiTerminal** – renders to a `FILE*` with `render(dom)` and clears the screen with `clear()`. Static factories: `stdout_terminal()` / `stderr_terminal()`.
-```cpp
-tui::AnsiTerminal::stdout_terminal().render(dom);
-```
-- **out_terminal / err_terminal** – inline singletons bound to stdout/stderr so you can `tui::out_terminal.render(dom);`.
+- **Formatting** – `DomNode` specializes `std::formatter`, so `std::format("{}", dom)` or `std::print("{}", dom)` produces ANSI-styled output.
 
 ## Logging (module `jowi.crogger`)
 

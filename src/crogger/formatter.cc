@@ -47,15 +47,14 @@ namespace jowi::crogger {
     std::expected<std::string, LogError> format(const LogContext &ctx) const {
       std::expected<std::string, LogError> buf{std::string{}};
       std::back_insert_iterator<std::string> it = std::back_inserter(buf.value());
-      tui::AnsiFormatter<std::back_insert_iterator<std::string>>::render(
-        tui::Layout{}.append_child(
+      std::format_to(
+        it,
+        "{}",
+        tui::DomNode::vstack(
           tui::Layout{}
             .style(tui::DomStyle{}.fg(get_level_color(ctx.status.level)))
             .append_child(tui::Paragraph("[{}]", ctx.status.name).no_newline())
-        ),
-        it,
-        0,
-        std::nullopt
+        )
       );
       std::format_to(it, " {:%FT%TZ} ", ctx.time);
       ctx.message.format(it);

@@ -38,7 +38,7 @@ int main(int argc, const char **argv) {
       auto layout = tui::Layout{};
       layout.style(std::move(style));
       layout.append_child(tui::DomNode::paragraph(line));
-      static_cast<void>(tui::out_terminal.render(tui::DomNode::vstack(std::move(layout))));
+      std::print("{}", tui::DomNode::vstack(std::move(layout)));
     };
 
     if (is_first_line && headers) {

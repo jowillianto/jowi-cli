@@ -11,14 +11,14 @@ import :error;
 namespace jowi::crogger {
   namespace fs = std::filesystem;
   export template <class T>
-  concept IsEmitter = requires(const T Emitter, std::string data) {
+  concept IsEmitter = requires(const T Emitter, std::string_view data) {
     { Emitter.emit(data) } -> std::same_as<std::expected<void, LogError>>;
   };
 
   export template <class T = void> struct Emitter;
 
   template <> struct Emitter<void> {
-    virtual std::expected<void, LogError> emit(std::string) const = 0;
+    virtual std::expected<void, LogError> emit(std::string_view) const = 0;
     virtual ~Emitter() = default;
 
     template <IsEmitter EmitterType, class... Args>
@@ -41,13 +41,13 @@ namespace jowi::crogger {
       requires(std::move_constructible<T>)
       : T{std::forward<T &&>(v)} {}
 
-    std::expected<void, LogError> emit(std::string d) const override {
+    std::expected<void, LogError> emit(std::string_view d) const override {
       return T::emit(d);
     }
   };
 
   export struct EmptyEmitter {
-    std::expected<void, LogError> emit(std::string data) const {
+    std::expected<void, LogError> emit(std::string_view data) const {
       return {};
     }
   };
@@ -69,7 +69,7 @@ namespace jowi::crogger {
     FileEmitter(FilePtrType f, fs::path p) : __f{std::move(f)}, __path{std::move(p)} {}
 
   public:
-    std::expected<void, LogError> emit(std::string v) const {
+    std::expected<void, LogError> emit(std::string_view v) const {
       auto res = fwrite(v.data(), sizeof(char), v.length(), __f.get());
       if (res != v.length()) {
         return std::unexpected{LogError::io_error("cannot write to file {}", __path.c_str())};
@@ -92,14 +92,14 @@ namespace jowi::crogger {
   };
 
   export struct StdoutEmitter {
-    std::expected<void, LogError> emit(std::string d) const {
+    std::expected<void, LogError> emit(std::string_view d) const noexcept {
       fwrite(d.data(), sizeof(char), d.length(), stdout);
       return {};
     }
   };
 
   export struct StderrEmitter {
-    std::expected<void, LogError> emit(std::string d) const {
+    std::expected<void, LogError> emit(std::string_view d) const noexcept {
       fwrite(d.data(), sizeof(char), d.length(), stderr);
       return {};
     }
