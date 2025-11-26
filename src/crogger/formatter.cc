@@ -49,14 +49,14 @@ namespace jowi::crogger {
       std::back_insert_iterator<std::string> it = std::back_inserter(buf.value());
       std::format_to(
         it,
-        "{}",
+        "{} {:%FT%TZ} ",
         tui::DomNode::vstack(
           tui::Layout{}
             .style(tui::DomStyle{}.fg(get_level_color(ctx.status.level)))
             .append_child(tui::Paragraph("[{}]", ctx.status.name).no_newline())
-        )
+        ),
+        ctx.time
       );
-      std::format_to(it, " {:%FT%TZ} ", ctx.time);
       ctx.message.format(it);
       it = '\n';
       return buf;
